@@ -5,6 +5,7 @@ import {
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Config, Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai";
+import type { ToolCallPart } from "effect/unstable/ai/Response";
 import { Command, Flag } from "effect/unstable/cli";
 import { FetchHttpClient } from "effect/unstable/http";
 import { AppConfig } from "./domains/app-config.ts";
@@ -30,6 +31,8 @@ const ToolsLayer = Tools.toLayer(
 			ReadFile: Effect.fn("Tools.ReadFile")(
 				function* ({ filePath }: { filePath: string }) {
 					const content = yield* fs.readFileString(filePath);
+
+					yield* Effect.log("Read file...", { filePath, content });
 
 					return content;
 				},
@@ -59,7 +62,12 @@ export class Assistant extends ServiceMap.Service<
 		answer(question: string): Effect.Effect<
 			{
 				readonly text: string;
-				readonly toolCallCount: number;
+				readonly toolCalls: ToolCallPart<
+					"ReadFile",
+					{
+						readonly filePath: string;
+					}
+				>[];
 			},
 			AssistantError
 		>;
@@ -82,11 +90,9 @@ export class Assistant extends ServiceMap.Service<
 						toolChoice: "required",
 					});
 
-					yield* Effect.log("Generated text...", { text, toolCalls });
-
 					return {
 						text,
-						toolCallCount: toolCalls.length,
+						toolCalls,
 					};
 				},
 
@@ -113,18 +119,13 @@ export class Assistant extends ServiceMap.Service<
 const prompt = Flag.string("prompt").pipe(
 	Flag.withAlias("p"),
 	Flag.withDescription("Prompt to operate on"),
-	Flag.withDefault(
-		"How many tools are available to you in this request? Number only.",
-	),
 );
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
 	Effect.gen(function* () {
 		const assistant = yield* Assistant;
 
-		const { text } = yield* assistant.answer(prompt);
-
-		yield* Effect.log(text);
+		yield* assistant.answer(prompt);
 	}),
 ).pipe(Command.withDescription("CodeCrafters Assistant"));
 
