@@ -45,7 +45,7 @@ const ToolsLayer = Tools.toLayer(
 					return content;
 				},
 
-				Effect.catch((error) => Effect.die(error)),
+				Effect.catch(() => Effect.succeed("Error reading file")),
 			),
 		});
 	}),
