@@ -3,15 +3,7 @@ import {
 	OpenRouterLanguageModel,
 } from "@effect/ai-openrouter";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import {
-	Config,
-	Console,
-	Effect,
-	FileSystem,
-	Layer,
-	Schema,
-	ServiceMap,
-} from "effect";
+import { Config, Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai";
 import { Command, Flag } from "effect/unstable/cli";
 import { FetchHttpClient } from "effect/unstable/http";
@@ -85,7 +77,7 @@ export class Assistant extends ServiceMap.Service<
 					const { text, toolCalls } = yield* LanguageModel.generateText({
 						prompt: question,
 						toolkit,
-						toolChoice: "auto",
+						toolChoice: "required",
 					});
 
 					return {
@@ -126,11 +118,11 @@ const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
 	Effect.gen(function* () {
 		const assistant = yield* Assistant;
 
-		yield* Effect.logDebug("Prompting assistant...", { prompt });
+		yield* Effect.log("Prompting assistant...", { prompt });
 
-		const { text } = yield* assistant.answer(prompt);
+		const { text, toolCallCount } = yield* assistant.answer(prompt);
 
-		yield* Console.log(text);
+		yield* Effect.log(text);
 	}),
 ).pipe(Command.withDescription("CodeCrafters Assistant"));
 
