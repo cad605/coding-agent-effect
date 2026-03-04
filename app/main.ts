@@ -29,7 +29,11 @@ const ToolsLayer = Tools.toLayer(
 		return Tools.of({
 			ReadFile: Effect.fn("Tools.ReadFile")(
 				function* ({ filePath }: { filePath: string }) {
-					return yield* fs.readFileString(`./${filePath}`);
+					const content = yield* fs.readFileString(filePath);
+
+					yield* Effect.log("Read file...", { filePath, content });
+
+					return content;
 				},
 
 				Effect.catch((error) => Effect.die(error)),
