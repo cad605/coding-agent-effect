@@ -80,33 +80,15 @@ export class Assistant extends ServiceMap.Service<
 					// Pass the toolkit to `generateText`. The model can call any tool in
 					// the toolkit; the framework resolves parameters, invokes handlers,
 					// and feeds results back automatically.
-					const response = yield* LanguageModel.generateText({
+					const { text, toolCalls } = yield* LanguageModel.generateText({
 						prompt: question,
 						toolkit,
 						toolChoice: "auto",
 					});
 
-					// -------------------------------------------------------------------
-					// 5. Inspecting tool calls and results
-					// -------------------------------------------------------------------
-
-					// `response.toolCalls` lists every tool the model invoked, each with
-					// the tool name, a unique id, and the decoded parameters.
-					for (const call of response.toolCalls) {
-						yield* Effect.log(`Tool call: ${call.name} id=${call.id}`);
-					}
-
-					// `response.toolResults` lists the resolved results, each with the
-					// tool name, id, decoded result, and an `isFailure` flag.
-					for (const result of response.toolResults) {
-						yield* Effect.log(
-							`Tool result: ${result.name} id=${result.id} isFailure=${result.isFailure}`,
-						);
-					}
-
 					return {
-						text: response.text,
-						toolCallCount: response.toolCalls.length,
+						text,
+						toolCallCount: toolCalls.length,
 					};
 				},
 				// Provide the chosen model to use
@@ -127,19 +109,17 @@ export class Assistant extends ServiceMap.Service<
 
 			return Assistant.of({ answer });
 		}),
-	).pipe();
+	);
 }
 
-// You can define flags outside of commands and reuse them across multiple
-// commands.
 const prompt = Flag.string("prompt").pipe(
 	Flag.withAlias("p"),
 	Flag.withDescription("Prompt to operate on"),
-	Flag.withDefault("What is the meaning of life?"),
+	Flag.withDefault(
+		"How many tools are available to you in this request? Number only.",
+	),
 );
 
-// Start with a root command and explicitly share the parent flags that should
-// be available to all subcommands.
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
 	Effect.gen(function* () {
 		const assistant = yield* Assistant;
