@@ -1,27 +1,35 @@
 {
-  "compilerOptions": {
-    // Enable latest features
-    "lib": ["ESNext", "DOM"],
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
+	"compilerOptions": {
+		// Enable latest features
+		"lib": ["ES2022", "DOM"],
+		"jsx": "react-jsx",
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleDetection": "force",
+		"allowJs": true,
+		"incremental": true,
+		"composite": true,
 
-    // Bundler mode
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
+		// Bundler mode
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"verbatimModuleSyntax": true,
+		"rewriteRelativeImportExtensions": true,
 
-    // Best practices
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
+		// Best practices
+		"strict": true,
+		"exactOptionalPropertyTypes": true,
+		"noUnusedLocals": true,
+		"noImplicitOverride": true,
 
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  }
+		// Some stricter flags (disabled by default)
+		"noUnusedParameters": false,
+		"noPropertyAccessFromIndexSignature": false,
+
+		"plugins": [
+			{
+				"name": "@effect/language-service"
+			}
+		]
+	}
 }

@@ -1,54 +1,165 @@
-import OpenAI from "openai";
+import {
+	OpenRouterClient,
+	OpenRouterLanguageModel,
+} from "@effect/ai-openrouter";
+import { BunRuntime, BunServices } from "@effect/platform-bun";
+import { Config, Console, Effect, Layer, Schema, ServiceMap } from "effect";
+import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai";
+import { Command, Flag } from "effect/unstable/cli";
+import { FetchHttpClient } from "effect/unstable/http";
+import { AppConfig } from "./domains/app-config.ts";
 
-async function main() {
-  const [, , flag, prompt] = process.argv;
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const baseURL =
-    process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
+const ReadTool = Tool.make("read", {
+	description: "Read and return the contents of a file",
+	parameters: Schema.Struct({
+		filePath: Schema.String.annotate({
+			description: "The path to the file to read",
+		}),
+	}),
+	success: Schema.String,
+	failureMode: "error",
+});
 
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is not set");
-  }
-  if (flag !== "-p" || !prompt) {
-    throw new Error("error: -p flag is required");
-  }
+const Tools = Toolkit.make(ReadTool);
 
-  const client = new OpenAI({
-    apiKey: apiKey,
-    baseURL: baseURL,
-  });
+const ToolsLayer = Tools.toLayer(
+	Effect.gen(function* () {
+		yield* Effect.logDebug("Initializing tools...");
+		return Tools.of({
+			read: Effect.fn("Tools.read")(function* ({
+				filePath,
+			}: {
+				filePath: string;
+			}) {
+				yield* Effect.logDebug("Reading file...", { filePath });
+				return "Hello, world!";
+			}),
+		});
+	}),
+);
 
-  const response = await client.chat.completions.create({
-    model: "anthropic/claude-haiku-4.5",
-    messages: [{ role: "user", content: prompt }],
-    tools: [{
-      "type": "function",
-      "function": {
-        "name": "Read",
-        "description": "Read and return the contents of a file",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "file_path": {
-              "type": "string",
-              "description": "The path to the file to read"
-            }
-          },
-          "required": ["file_path"]
-        }
-      }
-    }]
-  });
+const OpenRouter = OpenRouterClient.layerConfig({
+	apiKey: Config.redacted("OPENROUTER_API_KEY"),
+	apiUrl: Config.withDefault(
+		Config.string("OPENROUTER_BASE_URL"),
+		"https://openrouter.ai/api/v1",
+	),
+}).pipe(Layer.provide(FetchHttpClient.layer));
 
-  if (!response.choices || response.choices.length === 0) {
-    throw new Error("no choices in response");
-  }
+export class AssistantError extends Schema.TaggedErrorClass<AssistantError>()(
+	"AssistantError",
+	{ reason: AiError.AiErrorReason },
+) {}
 
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  console.error("Logs from your program will appear here!");
+// Wrap tool-enabled generation in a service
+export class Assistant extends ServiceMap.Service<
+	Assistant,
+	{
+		answer(question: string): Effect.Effect<
+			{
+				readonly text: string;
+				readonly toolCallCount: number;
+			},
+			AssistantError
+		>;
+	}
+>()("@codecrafters/claude-code/Assistant") {
+	static readonly layer = Layer.effect(
+		Assistant,
+		Effect.gen(function* () {
+			// Access the toolkit's handlers by yielding the toolkit definition.
+			const toolkit = yield* Tools;
 
-  // TODO: Uncomment the lines below to pass the first stage
-  console.log(response.choices[0].message.content);
+			// Choose a model to use
+			const model = yield* OpenRouterLanguageModel.model(
+				"anthropic/claude-haiku-4.5",
+			);
+
+			const answer = Effect.fn("Assistant.answer")(
+				function* (question: string) {
+					// Pass the toolkit to `generateText`. The model can call any tool in
+					// the toolkit; the framework resolves parameters, invokes handlers,
+					// and feeds results back automatically.
+					const response = yield* LanguageModel.generateText({
+						prompt: question,
+						toolkit,
+						toolChoice: "auto",
+					});
+
+					// -------------------------------------------------------------------
+					// 5. Inspecting tool calls and results
+					// -------------------------------------------------------------------
+
+					// `response.toolCalls` lists every tool the model invoked, each with
+					// the tool name, a unique id, and the decoded parameters.
+					for (const call of response.toolCalls) {
+						yield* Effect.log(`Tool call: ${call.name} id=${call.id}`);
+					}
+
+					// `response.toolResults` lists the resolved results, each with the
+					// tool name, id, decoded result, and an `isFailure` flag.
+					for (const result of response.toolResults) {
+						yield* Effect.log(
+							`Tool result: ${result.name} id=${result.id} isFailure=${result.isFailure}`,
+						);
+					}
+
+					return {
+						text: response.text,
+						toolCallCount: response.toolCalls.length,
+					};
+				},
+				// Provide the chosen model to use
+				Effect.provide(model),
+				// Map AI errors into our domain error type
+				Effect.catchTag(
+					"AiError",
+					(error) =>
+						Effect.fail(
+							new AssistantError({
+								reason: error.reason,
+							}),
+						),
+					// For unexpected errors, die with the original error
+					(e) => Effect.die(e),
+				),
+			);
+
+			return Assistant.of({ answer });
+		}),
+	).pipe();
 }
 
-main();
+// You can define flags outside of commands and reuse them across multiple
+// commands.
+const prompt = Flag.string("prompt").pipe(
+	Flag.withAlias("p"),
+	Flag.withDescription("Prompt to operate on"),
+	Flag.withDefault("What is the meaning of life?"),
+);
+
+// Start with a root command and explicitly share the parent flags that should
+// be available to all subcommands.
+const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
+	Effect.gen(function* () {
+		const assistant = yield* Assistant;
+
+		const { text } = yield* assistant.answer(prompt);
+
+		yield* Console.log(text);
+	}),
+).pipe(Command.withDescription("CodeCrafters Assistant"));
+
+const program = Command.run(assistant, {
+	version: "1.0.0",
+});
+
+// Compose all layers into a single app layer
+const appLayer = AppConfig.layer.pipe(
+	Layer.provideMerge(Assistant.layer),
+	Layer.provideMerge(OpenRouter),
+	Layer.provideMerge(ToolsLayer),
+	Layer.provideMerge(BunServices.layer),
+);
+
+program.pipe(Effect.provide(appLayer), BunRuntime.runMain);

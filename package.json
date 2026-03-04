@@ -1,14 +1,25 @@
 {
-  "name": "@codecrafters/claude-code",
-  "description": "Build your own Claude Code challenge, from CodeCrafters",
-  "type": "module",
-  "scripts": {
-    "dev": "bun run app/main.ts"
-  },
-  "dependencies": {
-    "openai": "^6.16.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "@codecrafters/claude-code",
+	"description": "Build your own Claude Code challenge, from CodeCrafters",
+	"type": "module",
+	"scripts": {
+		"dev": "bun run app/main.ts",
+		"biome:check": "biome check .",
+		"biome:format": "biome format --write"
+	},
+	"dependencies": {
+		"@effect/ai-openrouter": "beta",
+		"@effect/platform-bun": "beta",
+		"effect": "beta",
+		"openai": "^6.16.0"
+	},
+	"devDependencies": {
+		"@effect/language-service": "0.77.0",
+		"@biomejs/biome": "2.4.5",
+		"@types/bun": "1.3.10",
+		"rimraf": "6.1.3",
+		"syncpack": "14.0.0",
+		"turbo": "2.8.13",
+		"typescript": "5.9.3"
+	}
 }
