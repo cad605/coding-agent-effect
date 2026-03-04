@@ -3,13 +3,21 @@ import {
 	OpenRouterLanguageModel,
 } from "@effect/ai-openrouter";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Config, Console, Effect, Layer, Schema, ServiceMap } from "effect";
+import {
+	Config,
+	Console,
+	Effect,
+	FileSystem,
+	Layer,
+	Schema,
+	ServiceMap,
+} from "effect";
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai";
 import { Command, Flag } from "effect/unstable/cli";
 import { FetchHttpClient } from "effect/unstable/http";
 import { AppConfig } from "./domains/app-config.ts";
 
-const ReadTool = Tool.make("read", {
+const ReadTool = Tool.make("ReadFile", {
 	description: "Read and return the contents of a file",
 	parameters: Schema.Struct({
 		filePath: Schema.String.annotate({
@@ -24,16 +32,16 @@ const Tools = Toolkit.make(ReadTool);
 
 const ToolsLayer = Tools.toLayer(
 	Effect.gen(function* () {
-		yield* Effect.logDebug("Initializing tools...");
+		const fs = yield* FileSystem.FileSystem;
+
 		return Tools.of({
-			read: Effect.fn("Tools.read")(function* ({
-				filePath,
-			}: {
-				filePath: string;
-			}) {
-				yield* Effect.logDebug("Reading file...", { filePath });
-				return "Hello, world!";
-			}),
+			ReadFile: Effect.fn("Tools.ReadFile")(
+				function* ({ filePath }: { filePath: string }) {
+					return yield* fs.readFileString(filePath);
+				},
+
+				Effect.catch((error) => Effect.die(error)),
+			),
 		});
 	}),
 );
@@ -51,7 +59,6 @@ export class AssistantError extends Schema.TaggedErrorClass<AssistantError>()(
 	{ reason: AiError.AiErrorReason },
 ) {}
 
-// Wrap tool-enabled generation in a service
 export class Assistant extends ServiceMap.Service<
 	Assistant,
 	{
@@ -67,19 +74,14 @@ export class Assistant extends ServiceMap.Service<
 	static readonly layer = Layer.effect(
 		Assistant,
 		Effect.gen(function* () {
-			// Access the toolkit's handlers by yielding the toolkit definition.
 			const toolkit = yield* Tools;
 
-			// Choose a model to use
 			const model = yield* OpenRouterLanguageModel.model(
 				"anthropic/claude-haiku-4.5",
 			);
 
 			const answer = Effect.fn("Assistant.answer")(
 				function* (question: string) {
-					// Pass the toolkit to `generateText`. The model can call any tool in
-					// the toolkit; the framework resolves parameters, invokes handlers,
-					// and feeds results back automatically.
 					const { text, toolCalls } = yield* LanguageModel.generateText({
 						prompt: question,
 						toolkit,
@@ -91,9 +93,9 @@ export class Assistant extends ServiceMap.Service<
 						toolCallCount: toolCalls.length,
 					};
 				},
-				// Provide the chosen model to use
+
 				Effect.provide(model),
-				// Map AI errors into our domain error type
+
 				Effect.catchTag(
 					"AiError",
 					(error) =>
@@ -102,8 +104,8 @@ export class Assistant extends ServiceMap.Service<
 								reason: error.reason,
 							}),
 						),
-					// For unexpected errors, die with the original error
-					(e) => Effect.die(e),
+
+					(error) => Effect.die(error),
 				),
 			);
 
@@ -134,7 +136,6 @@ const program = Command.run(assistant, {
 	version: "1.0.0",
 });
 
-// Compose all layers into a single app layer
 const appLayer = AppConfig.layer.pipe(
 	Layer.provideMerge(Assistant.layer),
 	Layer.provideMerge(OpenRouter),
