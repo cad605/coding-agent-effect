@@ -95,7 +95,6 @@ export class Assistant extends ServiceMap.Service<
 					const { text, toolCalls } = yield* LanguageModel.generateText({
 						prompt: question,
 						toolkit,
-						toolChoice: "required",
 					});
 
 					return {
