@@ -118,9 +118,7 @@ const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
 	Effect.gen(function* () {
 		const assistant = yield* Assistant;
 
-		yield* Effect.log("Prompting assistant...", { prompt });
-
-		const { text, toolCallCount } = yield* assistant.answer(prompt);
+		const { text } = yield* assistant.answer(prompt);
 
 		yield* Effect.log(text);
 	}),
