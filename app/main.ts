@@ -3,7 +3,15 @@ import {
 	OpenRouterLanguageModel,
 } from "@effect/ai-openrouter";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Config, Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
+import {
+	Config,
+	Console,
+	Effect,
+	FileSystem,
+	Layer,
+	Schema,
+	ServiceMap,
+} from "effect";
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai";
 import type { ToolCallPart } from "effect/unstable/ai/Response";
 import { Command, Flag } from "effect/unstable/cli";
@@ -32,7 +40,7 @@ const ToolsLayer = Tools.toLayer(
 				function* ({ filePath }: { filePath: string }) {
 					const content = yield* fs.readFileString(filePath);
 
-					yield* Effect.log("Read file...", { filePath, content });
+					yield* Console.log(content);
 
 					return content;
 				},
