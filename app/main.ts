@@ -31,8 +31,6 @@ const ToolsLayer = Tools.toLayer(
 				function* ({ filePath }: { filePath: string }) {
 					const content = yield* fs.readFileString(filePath);
 
-					yield* Effect.log("Read file...", { filePath, content });
-
 					return content;
 				},
 
@@ -83,6 +81,8 @@ export class Assistant extends ServiceMap.Service<
 						toolkit,
 						toolChoice: "required",
 					});
+
+					yield* Effect.log("Generated text...", { text, toolCalls });
 
 					return {
 						text,
