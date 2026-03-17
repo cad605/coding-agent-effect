@@ -14,20 +14,27 @@ export const AiAssistantLive = Layer.effect(
 
     const answer = Effect.fn("Assistant.answer")(
       function* (prompt: string) {
-        const session = yield* Chat.fromPrompt([{
-          role: "system",
-          content: "You are a helpful assistant specialized in coding."
-        }])
+        const session = yield* Chat.fromPrompt([
+          {
+            role: "system",
+            content: "You are a helpful assistant specialized in coding.",
+          },
+        ]);
 
+        while (true) {
+          const response = yield* session
+            .generateText({
+              prompt,
+              toolkit,
+            })
+            .pipe(Effect.provide(model));
 
-          const response = yield* session.generateText({
-            prompt,
-            toolkit,
-          }).pipe(Effect.provide(model));
-
+          if (response.finishReason !== "stop") {
+            continue;
+          }
 
           return response.text;
-        
+        }
       },
 
       Effect.catchTag(
