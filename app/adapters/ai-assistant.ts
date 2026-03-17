@@ -14,12 +14,14 @@ export const AiAssistantLive = Layer.effect(
 
     const answer = Effect.fn("Assistant.answer")(
       function* (question: string) {
-        const { text, toolCalls } = yield* LanguageModel.generateText({
+        
+        const { text, toolCalls, finishReason } = yield* LanguageModel.generateText({
           prompt: question,
           toolkit,
         });
 
         return {
+          finishReason,
           text,
           toolCalls,
         };

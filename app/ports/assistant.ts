@@ -18,6 +18,7 @@ export type AssistantShape = {
           }
         >
       >;
+      readonly finishReason: "length" | "error" | "stop" | "content-filter" | "tool-calls" | "pause" | "other" | "unknown";
     },
     AssistantError
   >;
