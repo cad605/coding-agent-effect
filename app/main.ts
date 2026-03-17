@@ -4,12 +4,12 @@ import { Command, Flag } from "effect/unstable/cli";
 
 import { AiAssistantLive } from "./adapters/ai-assistant.ts";
 import { FileSystemToolsLive } from "./adapters/file-system-tools.ts";
-import { OpenRouterLive } from "./adapters/openrouter.ts";
+import { OpenRouterLive } from "./adapters/open-router.ts";
 import { Assistant } from "./ports/assistant.ts";
 
 const prompt = Flag.string("prompt").pipe(
   Flag.withAlias("p"),
-  Flag.withDescription("Prompt to operate on"),
+  Flag.withDescription("The prompt to operate on."),
 );
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
