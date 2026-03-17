@@ -1,6 +1,6 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
 import { Effect, Layer } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { Chat } from "effect/unstable/ai";
 
 import { Assistant, AssistantError } from "../ports/assistant.ts";
 import { Tools } from "../ports/tools.ts";
@@ -13,21 +13,22 @@ export const AiAssistantLive = Layer.effect(
     const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
 
     const answer = Effect.fn("Assistant.answer")(
-      function* (question: string) {
+      function* (prompt: string) {
+        const session = yield* Chat.fromPrompt([{
+          role: "system",
+          content: "You are a helpful assistant specialized in coding."
+        }])
+
+
+          const response = yield* session.generateText({
+            prompt,
+            toolkit,
+          }).pipe(Effect.provide(model));
+
+
+          return response.text;
         
-        const { text, toolCalls, finishReason } = yield* LanguageModel.generateText({
-          prompt: question,
-          toolkit,
-        });
-
-        return {
-          finishReason,
-          text,
-          toolCalls,
-        };
       },
-
-      Effect.provide(model),
 
       Effect.catchTag(
         "AiError",
