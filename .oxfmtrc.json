@@ -1,0 +1,6 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxfmt/configuration_schema.json",
+  "ignorePatterns": [".turbo", ".cursor", ".vscode", "node_modules", "bun.lock", "*.tsbuildinfo"],
+  "sortImports": {},
+  "sortPackageJson": {}
+}
