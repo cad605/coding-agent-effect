@@ -22,11 +22,10 @@ export const AiAssistantLive = Layer.effect(
         ]);
 
         while (true) {
-          const response = yield* session
-            .generateText({
-              prompt,
-              toolkit,
-            })
+          const response = yield* session.generateText({
+            prompt,
+            toolkit,
+          });
 
           if (response.finishReason !== "stop") {
             continue;
