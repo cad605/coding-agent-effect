@@ -6,6 +6,7 @@ import { AiAssistantLive } from "./adapters/ai-assistant.ts";
 import { FileSystemToolsLive } from "./adapters/file-system-tools.ts";
 import { OpenRouterLive } from "./adapters/open-router.ts";
 import { Assistant } from "./ports/assistant.ts";
+import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
 
 const prompt = Flag.string("prompt").pipe(
   Flag.withAlias("p"),
@@ -14,9 +15,11 @@ const prompt = Flag.string("prompt").pipe(
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
   Effect.gen(function* () {
-    const ai = yield* Assistant;
-    const text = yield* ai.answer(prompt);
-    yield* Console.log(text);
+    const ai = yield* Assistant
+
+    const response = yield* ai.answer(prompt);
+
+    yield* Console.log(response);
   }),
 ).pipe(Command.withDescription("CodeCrafters Assistant"));
 

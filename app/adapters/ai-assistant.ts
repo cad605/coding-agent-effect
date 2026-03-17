@@ -27,7 +27,6 @@ export const AiAssistantLive = Layer.effect(
               prompt,
               toolkit,
             })
-            .pipe(Effect.provide(model));
 
           if (response.finishReason !== "stop") {
             continue;
@@ -36,6 +35,8 @@ export const AiAssistantLive = Layer.effect(
           return response.text;
         }
       },
+
+      Effect.provide(model),
 
       Effect.catchTag(
         "AiError",
