@@ -16,11 +16,9 @@ const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
   Effect.gen(function* () {
     const assistant = yield* Assistant;
 
-    const { text, toolCalls } = yield* assistant.answer(prompt);
+    const { text } = yield* assistant.answer(prompt);
 
-    if (toolCalls.length === 0) {
-      yield* Console.log(text);
-    }
+    yield* Console.log(text);
   }),
 ).pipe(Command.withDescription("CodeCrafters Assistant"));
 
