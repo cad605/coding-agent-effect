@@ -14,15 +14,15 @@ const prompt = Flag.string("prompt").pipe(
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
   Effect.gen(function* () {
-    yield* Effect.logDebug("Starting assistant...");
+    yield* Effect.logDebug("Initializing agent...");
 
     const agent = yield* Agent;
 
     yield* Effect.logDebug("Prompting agent...", { prompt });
 
-    const response = yield* agent.answer(prompt);
+    const response = yield* agent.act(prompt);
 
-    yield* Effect.logDebug("Response received...", { response });
+    yield* Effect.logDebug("Collecting response...", { response });
 
     yield* Console.log(response);
 

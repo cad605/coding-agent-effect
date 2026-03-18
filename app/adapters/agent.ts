@@ -14,9 +14,9 @@ export const AgentLive = Layer.effect(
 
     const tools = yield* Tools;
 
-    const answer = Effect.fn("agent.answer")(
-      function* (content: string) {
-        yield* Effect.logDebug("Starting new session...", { content });
+    const act = Effect.fn("agent.act")(
+      function* (prompt: string) {
+        yield* Effect.logDebug("Starting new session...", { prompt });
 
         const session = yield* Chat.fromPrompt([
           {
@@ -25,7 +25,7 @@ export const AgentLive = Layer.effect(
           },
           {
             role: "user",
-            content,
+            content: prompt,
           },
         ]);
 
@@ -58,6 +58,6 @@ export const AgentLive = Layer.effect(
       ),
     );
 
-    return Agent.of({ answer });
+    return Agent.of({ act });
   }),
 );

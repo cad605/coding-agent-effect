@@ -11,8 +11,8 @@ export class AgentError extends Schema.TaggedErrorClass<AgentError>()("AgentErro
 }
 
 export type AgentShape = {
-  answer(
-    content: string,
+  act(
+    prompt: string,
   ): Effect.Effect<string, AgentError, FileSystem.FileSystem | ChildProcessSpawner>;
 };
 
