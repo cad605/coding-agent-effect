@@ -19,19 +19,23 @@ export const AgentLive = Layer.effect(
             role: "system",
             content: "You are a helpful assistant specialized in coding.",
           },
+          {
+            role: "user",
+            content: [{ type: "text", text: prompt }]
+          },
         ]);
 
         while (true) {
-          const response = yield* session.generateText({
-            prompt,
+          const { text, finishReason} = yield* session.generateText({
+            prompt: [],
             toolkit,
           });
 
-          if (response.finishReason !== "stop") {
+          if (finishReason !== "stop") {
             continue;
           }
 
-          return response.text;
+          return text;
         }
       },
 
