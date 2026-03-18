@@ -1,7 +1,8 @@
 import { Schema, FileSystem } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
-export const ReadFile = Tool.make("ReadFile", {
+export const ReadFile = Tool.make("readFile", {
   description: "Read and return the contents of a file",
   parameters: Schema.Struct({
     filePath: Schema.String.annotate({
@@ -13,7 +14,7 @@ export const ReadFile = Tool.make("ReadFile", {
   dependencies: [FileSystem.FileSystem],
 });
 
-export const WriteFile = Tool.make("WriteFile", {
+export const WriteFile = Tool.make("writeFile", {
   description: "Write content to a file",
   parameters: Schema.Struct({
     filePath: Schema.String.annotate({
@@ -28,4 +29,16 @@ export const WriteFile = Tool.make("WriteFile", {
   dependencies: [FileSystem.FileSystem],
 });
 
-export const Tools = Toolkit.make(ReadFile, WriteFile);
+export const Bash = Tool.make("bash", {
+  description: "Execute a shell command",
+  parameters: Schema.Struct({
+    command: Schema.String.annotate({
+      description: "The command to execute",
+    }),
+  }),
+  success: Schema.String,
+  failureMode: "error",
+  dependencies: [ChildProcessSpawner],
+});
+
+export const Tools = Toolkit.make(ReadFile, WriteFile, Bash);

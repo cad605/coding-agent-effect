@@ -8,12 +8,12 @@ import { Tools } from "../ports/tools.ts";
 export const AgentLive = Layer.effect(
   Agent,
   Effect.gen(function* () {
-    const toolkit = yield* Tools;
-
     const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
 
-    const answer = Effect.fn("Assistant.answer")(
-      function* (prompt: string) {
+    const tools = yield* Tools;
+
+    const answer = Effect.fn("agent.answer")(
+      function* (content: string) {
         const session = yield* Chat.fromPrompt([
           {
             role: "system",
@@ -21,17 +21,19 @@ export const AgentLive = Layer.effect(
           },
           {
             role: "user",
-            content: [{ type: "text", text: prompt }]
+            content,
           },
         ]);
 
         while (true) {
-          const { text, finishReason} = yield* session.generateText({
-            prompt: [],
-            toolkit,
-          });
+          const { text, toolCalls } = yield* session
+            .generateText({
+              prompt: [],
+              toolkit: tools,
+            })
+            .pipe(Effect.provide(model));
 
-          if (finishReason !== "stop") {
+          if (toolCalls.length > 0) {
             continue;
           }
 
@@ -39,18 +41,10 @@ export const AgentLive = Layer.effect(
         }
       },
 
-      Effect.provide(model),
-
       Effect.catchTag(
         "AiError",
-        (error) =>
-          Effect.fail(
-            new AgentError({
-              reason: error.reason,
-            }),
-          ),
-
-        (error) => Effect.die(error),
+        (error) => Effect.fail(AgentError.fromAiError(error)),
+        (e) => Effect.die(e),
       ),
     );
 

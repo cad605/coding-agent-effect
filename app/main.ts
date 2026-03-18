@@ -3,8 +3,8 @@ import { Console, Effect, Layer } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
 import { AgentLive } from "./adapters/agent.ts";
-import { FileSystemToolsLive } from "./adapters/file-system-tools.ts";
-import { OpenRouterLive } from "./adapters/open-router.ts";
+import { ProviderLive } from "./adapters/provider.ts";
+import { ToolsLive } from "./adapters/tools.ts";
 import { Agent } from "./ports/agent.ts";
 
 const prompt = Flag.string("prompt").pipe(
@@ -27,8 +27,8 @@ const program = Command.run(assistant, {
 });
 
 const appLayer = AgentLive.pipe(
-  Layer.provideMerge(OpenRouterLive),
-  Layer.provideMerge(FileSystemToolsLive),
+  Layer.provideMerge(ProviderLive),
+  Layer.provideMerge(ToolsLive),
   Layer.provideMerge(BunServices.layer),
 );
 
