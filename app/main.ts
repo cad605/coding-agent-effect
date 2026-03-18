@@ -2,10 +2,10 @@ import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Effect, Layer } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import { AiAssistantLive } from "./adapters/ai-assistant.ts";
+import { AgentLive } from "./adapters/agent.ts";
 import { FileSystemToolsLive } from "./adapters/file-system-tools.ts";
 import { OpenRouterLive } from "./adapters/open-router.ts";
-import { Assistant } from "./ports/assistant.ts";
+import { Agent } from "./ports/agent.ts";
 
 const prompt = Flag.string("prompt").pipe(
   Flag.withAlias("p"),
@@ -14,9 +14,9 @@ const prompt = Flag.string("prompt").pipe(
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
   Effect.gen(function* () {
-    const ai = yield* Assistant;
+    const agent = yield* Agent;
 
-    const response = yield* ai.answer(prompt);
+    const response = yield* agent.answer(prompt);
 
     yield* Console.log(response);
   }),
@@ -26,7 +26,7 @@ const program = Command.run(assistant, {
   version: "1.0.0",
 });
 
-const appLayer = AiAssistantLive.pipe(
+const appLayer = AgentLive.pipe(
   Layer.provideMerge(OpenRouterLive),
   Layer.provideMerge(FileSystemToolsLive),
   Layer.provideMerge(BunServices.layer),

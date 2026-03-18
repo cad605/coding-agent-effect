@@ -2,18 +2,31 @@ import { Effect, FileSystem } from "effect";
 
 import { Tools } from "../ports/tools.ts";
 
-export const FileSystemToolsLive = Tools.toLayer(
-  Effect.gen(function* () {
+const readFile = Effect.fn("Tools.ReadFile")(
+  function* ({ filePath }: { filePath: string }) {
     const fs = yield* FileSystem.FileSystem;
 
-    return Tools.of({
-      ReadFile: Effect.fn("Tools.ReadFile")(
-        function* ({ filePath }: { filePath: string }) {
-          return yield* fs.readFileString(filePath);
-        },
+    return yield* fs.readFileString(filePath);
+  },
 
-        Effect.catch(() => Effect.succeed("Error reading file")),
-      ),
-    });
+  Effect.catch(() => Effect.succeed("Error reading file")),
+);
+
+const writeFile = Effect.fn("Tools.WriteFile")(
+  function* ({ filePath, content }: { filePath: string; content: string }) {
+    const fs = yield* FileSystem.FileSystem;
+
+    yield* fs.writeFileString(filePath, content);
+
+    return "File written successfully";
+  },
+
+  Effect.catch(() => Effect.succeed("Error writing file")),
+);
+
+export const FileSystemToolsLive = Tools.toLayer(
+  Tools.of({
+    ReadFile: readFile,
+    WriteFile: writeFile,
   }),
 );

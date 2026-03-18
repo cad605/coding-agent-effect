@@ -2,11 +2,11 @@ import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
 import { Effect, Layer } from "effect";
 import { Chat } from "effect/unstable/ai";
 
-import { Assistant, AssistantError } from "../ports/assistant.ts";
+import { Agent, AgentError } from "../ports/agent.ts";
 import { Tools } from "../ports/tools.ts";
 
-export const AiAssistantLive = Layer.effect(
-  Assistant,
+export const AgentLive = Layer.effect(
+  Agent,
   Effect.gen(function* () {
     const toolkit = yield* Tools;
 
@@ -41,7 +41,7 @@ export const AiAssistantLive = Layer.effect(
         "AiError",
         (error) =>
           Effect.fail(
-            new AssistantError({
+            new AgentError({
               reason: error.reason,
             }),
           ),
@@ -50,6 +50,6 @@ export const AiAssistantLive = Layer.effect(
       ),
     );
 
-    return Assistant.of({ answer });
+    return Agent.of({ answer });
   }),
 );
