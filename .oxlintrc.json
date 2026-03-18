@@ -2,13 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "plugins": ["typescript", "import", "oxc", "eslint", "unicorn", "node"],
   "ignorePatterns": [
-    ".turbo",
+    ".codecrafters",
     ".cursor",
-    ".vscode",
     "node_modules",
-    "bun.lock",
-    "**/routeTree.gen.ts",
-    "**/_generated/**"
+    ".gitattributes",
+    ".gitignore",
+    "bun.lock"
   ],
   "categories": {
     "correctness": "error",

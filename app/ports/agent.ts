@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Schema, ServiceMap } from "effect";
+import { type Effect, type FileSystem, Schema, ServiceMap } from "effect";
 import { AiError } from "effect/unstable/ai";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 

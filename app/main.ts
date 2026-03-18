@@ -14,11 +14,19 @@ const prompt = Flag.string("prompt").pipe(
 
 const assistant = Command.make("assistant", { prompt }, ({ prompt }) =>
   Effect.gen(function* () {
+    yield* Effect.logDebug("Starting assistant...");
+
     const agent = yield* Agent;
+
+    yield* Effect.logDebug("Prompting agent...", { prompt });
 
     const response = yield* agent.answer(prompt);
 
+    yield* Effect.logDebug("Response received...", { response });
+
     yield* Console.log(response);
+
+    yield* Effect.logDebug("Assistant completed...");
   }),
 ).pipe(Command.withDescription("CodeCrafters Assistant"));
 

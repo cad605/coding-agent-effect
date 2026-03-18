@@ -8,6 +8,8 @@ const readFile = Effect.fn("tools.readFile")(
   function* ({ filePath }: { filePath: string }) {
     const fs = yield* FileSystem.FileSystem;
 
+    yield* Effect.logDebug("Reading file...", { filePath });
+
     return yield* fs.readFileString(filePath);
   },
 
@@ -17,6 +19,8 @@ const readFile = Effect.fn("tools.readFile")(
 const writeFile = Effect.fn("tools.writeFile")(
   function* ({ filePath, content }: { filePath: string; content: string }) {
     const fs = yield* FileSystem.FileSystem;
+
+    yield* Effect.logDebug("Writing file...", { filePath, content });
 
     yield* fs.writeFileString(filePath, content);
 
@@ -30,11 +34,11 @@ const bash = Effect.fn("tools.bash")(
   function* ({ command }: { command: string }) {
     const spawner = yield* ChildProcessSpawner;
 
-    const response = yield* spawner.string(ChildProcess.make(command, { shell: true }), {
+    yield* Effect.logDebug("Executing command...", { command });
+
+    return yield* spawner.string(ChildProcess.make(command, { shell: true }), {
       includeStderr: true,
     });
-
-    return response;
   },
 
   Effect.catch(() => Effect.succeed("Error executing command")),
