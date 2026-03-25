@@ -1,6 +1,6 @@
 import { Effect, Match, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import { AgentRunInput } from "../ports/agent-runtime.ts";
+import { AgentRunInput } from "../domain/models/agent-run.ts";
 import { Agent } from "../ports/agent.ts";
 
 const renderToolInput = (input: string) => input;
@@ -20,7 +20,7 @@ const assistant = Command.make(
 
     yield* Effect.logDebug("Prompting agent", { prompt });
 
-    const events = yield* agent.send(new AgentRunInput({ prompt, system: null }));
+    const events = yield* agent.send(new AgentRunInput({ prompt, system: null, session: null }));
 
     yield* Effect.logDebug("Streaming agent response");
 

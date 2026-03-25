@@ -1,109 +1,21 @@
-import { Effect, Layer, Match, Stream } from "effect";
+import { Effect, Layer, Stream } from "effect";
 
+import type { AgentError } from "../../domain/errors/agent.ts";
+import type { AgentEvent } from "../../domain/models/agent-events.ts";
+import { AgentExecutorTurnInput } from "../../domain/models/agent-executor.ts";
+import { AgentRunState } from "../../domain/models/agent-run.ts";
+import { mapAgentExecutorError } from "../../domain/utils/agent-error-mapper.ts";
+import { mapExecutorEvent } from "../../domain/utils/agent-event-mapper.ts";
+import { buildRunState } from "../../domain/utils/agent-run-state.ts";
 import {
-  AgentExecutor,
-  type AgentExecutorError,
-  type AgentExecutorEvent,
-  AgentExecutorTurnInput,
-} from "../../ports/agent-executor.ts";
-import { AgentRunState, AgentRunSystemMessage, AgentRunUserMessage } from "../../ports/agent-runtime.ts";
-import {
-  Agent,
-  AgentCompletionEvent,
-  AgentError,
-  type AgentEvent,
-  type AgentShape,
-  AgentTextEvent,
-  AgentToolCallEvent,
-  AgentToolFailureEvent,
-  AgentToolResultEvent,
-  ExecuteTurnFailed,
-  MissingCompletionSignal,
-  ModelExecutionFailed,
-  ToolExecutionFailed,
-  TurnBudgetExceeded,
-  UnsupportedRunMessage,
-  UnsupportedRunPart,
-} from "../../ports/agent.ts";
-
-const DEFAULT_SYSTEM_PROMPT = [
-  "You are a helpful assistant specialized in coding.",
-  "Use the available tools whenever they help you inspect the project or make changes.",
-  "When you have fully completed the user request, you must call the \"completeTask\" tool with a concise final summary.",
-  "Do not treat plain assistant text as task completion.",
-].join(" ");
-
-const MAX_TURNS = 24;
-
-const executeTurnFailed = (error: AgentExecutorError) =>
-  Match.valueTags(error.reason, {
-    UnsupportedRuntimeMessage: ({ role }) =>
-      new AgentError({
-        reason: new ExecuteTurnFailed({
-          reason: new UnsupportedRunMessage({ role }),
-        }),
-      }),
-    UnsupportedRuntimePart: ({ partType }) =>
-      new AgentError({
-        reason: new ExecuteTurnFailed({
-          reason: new UnsupportedRunPart({ partType }),
-        }),
-      }),
-    ToolRuntimeFailed: ({ toolName, message }) =>
-      new AgentError({
-        reason: new ExecuteTurnFailed({
-          reason: new ToolExecutionFailed({ toolName, message }),
-        }),
-      }),
-    ModelTurnFailed: () =>
-      new AgentError({
-        reason: new ExecuteTurnFailed({
-          reason: new ModelExecutionFailed({}),
-        }),
-      }),
-  });
-
-const mapExecutorEvent = (
-  event: AgentExecutorEvent,
-): AgentEvent =>
-  Match.valueTags(event, {
-    AssistantText: ({ text }) => new AgentTextEvent({ text }),
-    ToolCall: ({ toolName, input }) =>
-      new AgentToolCallEvent({
-        toolName,
-        input,
-      }),
-    ToolResult: ({ toolName, output, durationMs, truncated }) =>
-      new AgentToolResultEvent({
-        toolName,
-        output,
-        durationMs,
-        truncated,
-      }),
-    ToolFailure: ({ toolName, message, durationMs, truncated }) =>
-      new AgentToolFailureEvent({
-        toolName,
-        message,
-        durationMs,
-        truncated,
-      }),
-    Completion: ({ summary, status }) =>
-      new AgentCompletionEvent({
-        summary,
-        status,
-      }),
-  });
-
-const isCompletionEvent = (
-  event: AgentExecutorEvent,
-) => event._tag === "Completion";
-
-const isToolActivityEvent = (
-  event: AgentExecutorEvent,
-) =>
-  event._tag === "ToolCall"
-  || event._tag === "ToolResult"
-  || event._tag === "ToolFailure";
+  hasReachedTurnBudget,
+  missingCompletionSignalError,
+  turnBudgetExceededError,
+  turnHasCompletion,
+  turnHasToolActivity,
+} from "../../domain/utils/agent-turn-policy.ts";
+import { AgentExecutor } from "../../ports/agent-executor.ts";
+import { Agent, type AgentShape } from "../../ports/agent.ts";
 
 const makeImpl = Effect.gen(function*() {
   const executor = yield* AgentExecutor;
@@ -112,61 +24,46 @@ const makeImpl = Effect.gen(function*() {
     function*(
       { run, turns }: { run: AgentRunState; turns: number },
     ): Effect.fn.Return<Stream.Stream<AgentEvent, AgentError>, AgentError> {
-      if (turns >= MAX_TURNS) {
-        return Stream.fail(
-          new AgentError({
-            reason: new TurnBudgetExceeded({ maxTurns: MAX_TURNS }),
-          }),
-        );
+      if (hasReachedTurnBudget(turns)) {
+        return Stream.fail(turnBudgetExceededError());
       }
 
       const turn = yield* executor.executeTurn(new AgentExecutorTurnInput({ run })).pipe(
-        Effect.catchTag("AgentExecutorError", (error) => Effect.fail(executeTurnFailed(error))),
+        Effect.catchTag("AgentExecutorError", (error) => Effect.fail(mapAgentExecutorError(error))),
       );
 
       const current = Stream.fromIterable(turn.events.map(mapExecutorEvent));
 
-      const nextRun = new AgentRunState({
-        messages: [...run.messages, ...turn.messages],
-      });
-
-      if (turn.events.some(isCompletionEvent)) {
+      if (turnHasCompletion(turn)) {
         return current;
       }
 
-      if (!turn.events.some(isToolActivityEvent)) {
+      if (!turnHasToolActivity(turn)) {
         return Stream.concat(
           current,
-          Stream.fail(
-            new AgentError({
-              reason: new MissingCompletionSignal({}),
-            }),
-          ),
+          Stream.fail(missingCompletionSignalError()),
         );
       }
 
       return Stream.concat(
         current,
-        Stream.unwrap(runAgentLoop({ run: nextRun, turns: turns + 1 })),
+        Stream.unwrap(runAgentLoop({
+          run: new AgentRunState({
+            messages: [...run.messages, ...turn.messages],
+          }),
+          turns: turns + 1,
+        })),
       );
     },
   );
 
-  const send: AgentShape["send"] = Effect.fn("agent.send")(function*({ prompt, system }) {
-    yield* Effect.logDebug("Starting new session", { prompt });
+  const send: AgentShape["send"] = Effect.fn("agent.send")(function*(input) {
+    const run = buildRunState(input);
 
-    const run = new AgentRunState({
-      messages: [
-        new AgentRunSystemMessage({
-          content: system ?? DEFAULT_SYSTEM_PROMPT,
-          role: "system",
-        }),
-        new AgentRunUserMessage({
-          content: prompt,
-          role: "user",
-        }),
-      ],
-    });
+    yield* Effect.logDebug(
+      input.session === null ? "Starting new session" : "Continuing session",
+      { prompt: input.prompt },
+    );
 
     return Stream.unwrap(runAgentLoop({ run, turns: 0 }));
   });

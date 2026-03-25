@@ -1,13 +1,5 @@
 import { Schema } from "effect";
 
-export class AgentRunInput extends Schema.Class("AgentRunInput")({
-  prompt: Schema.String,
-  system: Schema.NullOr(Schema.String),
-}) {
-  declare readonly prompt: string;
-  declare readonly system: string | null;
-}
-
 export class AgentRunTextPart extends Schema.Class("AgentRunTextPart")({
   type: Schema.Literal("text"),
   text: Schema.String,
@@ -83,6 +75,22 @@ export type AgentRunMessage =
   | AgentRunUserMessage
   | AgentRunAssistantMessage
   | AgentRunToolMessage;
+
+export class AgentSession extends Schema.Class("AgentSession")({
+  messages: Schema.Array(AgentRunMessage),
+}) {
+  declare readonly messages: ReadonlyArray<AgentRunMessage>;
+}
+
+export class AgentRunInput extends Schema.Class("AgentRunInput")({
+  prompt: Schema.String,
+  system: Schema.NullOr(Schema.String),
+  session: Schema.NullOr(AgentSession),
+}) {
+  declare readonly prompt: string;
+  declare readonly system: string | null;
+  declare readonly session: AgentSession | null;
+}
 
 export class AgentRunState extends Schema.Class("AgentRunState")({
   messages: Schema.Array(AgentRunMessage),

@@ -84,6 +84,11 @@ export const BashTool = Tool.make("bash", {
   failureMode: "error",
 });
 
+export class CompleteTaskResult extends Schema.Class("CompleteTaskResult")({
+  summary: Schema.String,
+  status: Schema.Literal("completed"),
+}) {}
+
 export const CompleteTaskTool = Tool.make("completeTask", {
   description: "Signal that the requested task is complete",
   parameters: Schema.Struct({
@@ -91,7 +96,7 @@ export const CompleteTaskTool = Tool.make("completeTask", {
       description: "A concise final summary of the completed task",
     }),
   }),
-  success: Schema.Void,
+  success: CompleteTaskResult,
   failure: ToolkitError,
   failureMode: "error",
 });

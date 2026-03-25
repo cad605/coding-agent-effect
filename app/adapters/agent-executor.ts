@@ -3,22 +3,22 @@ import { Clock, Effect, Layer, Stream } from "effect";
 import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
 import {
-  AgentExecutor,
+  AgentExecutorError,
+  ModelTurnFailed,
+  ToolRuntimeFailed,
+  UnsupportedRuntimeMessage,
+  UnsupportedRuntimePart,
+} from "../domain/errors/agent-executor.ts";
+import {
   AgentExecutorAssistantTextEvent,
   AgentExecutorCompletionEvent,
-  AgentExecutorError,
   type AgentExecutorEvent,
-  type AgentExecutorShape,
   AgentExecutorToolCallEvent,
   AgentExecutorToolFailureEvent,
   AgentExecutorToolResultEvent,
   type AgentExecutorTurnInput,
   AgentExecutorTurnResult,
-  ModelTurnFailed,
-  ToolRuntimeFailed,
-  UnsupportedRuntimeMessage,
-  UnsupportedRuntimePart,
-} from "../ports/agent-executor.ts";
+} from "../domain/models/agent-executor.ts";
 import {
   AgentRunAssistantMessage,
   type AgentRunAssistantPart,
@@ -29,13 +29,17 @@ import {
   AgentRunToolCallPart,
   AgentRunToolMessage,
   AgentRunToolResultPart,
-} from "../ports/agent-runtime.ts";
+} from "../domain/models/agent-run.ts";
+import { AgentExecutor } from "../ports/agent-executor.ts";
+import type { AgentExecutorShape } from "../ports/agent-executor.ts";
 import {
   AgentExecutorToolRuntime,
   AgentExecutorToolRuntimeService,
   AgentExecutorTools,
+  CompleteTaskResult,
 } from "./services/agent-executor-tools.ts";
 import type { ToolkitError } from "./services/agent-executor-tools.ts";
+import { ProviderService } from "./services/provider.ts";
 
 const TOOL_OUTPUT_LIMIT = 2_000;
 
@@ -166,6 +170,36 @@ const toPromptMessage = (
 
 const buildPrompt = (run: AgentRunState) => Prompt.make(run.messages.map(toPromptMessage));
 
+const toCompletionEvent = (
+  messages: ReadonlyArray<AgentRunMessage>,
+): AgentExecutorCompletionEvent | null => {
+  for (const message of messages) {
+    if (message.role !== "tool") {
+      continue;
+    }
+
+    for (const part of message.content) {
+      if (
+        part.name === "completeTask"
+        && part.isFailure === false
+        && typeof part.result === "object"
+        && part.result !== null
+        && "summary" in part.result
+        && "status" in part.result
+        && typeof part.result.summary === "string"
+        && part.result.status === "completed"
+      ) {
+        return new AgentExecutorCompletionEvent({
+          summary: part.result.summary,
+          status: "completed",
+        });
+      }
+    }
+  }
+
+  return null;
+};
+
 const fromAssistantPart = (
   part: Prompt.AssistantMessagePart,
 ): Effect.Effect<AgentRunAssistantPart, AgentExecutorError, never> => {
@@ -262,7 +296,6 @@ const makeImpl = Effect.gen(function*() {
 
       const events: Array<AgentExecutorEvent> = [];
       const response: Array<Response.AnyPart> = [];
-      let completionSummary: string | null = null;
 
       const pushEvent = Effect.fn("agent-executor.pushEvent")(function*(event: AgentExecutorEvent) {
         return Effect.sync(() => {
@@ -335,7 +368,6 @@ const makeImpl = Effect.gen(function*() {
             }),
           );
 
-          completionSummary = summary;
           const finishedAt = yield* Clock.currentTimeMillis;
 
           yield* pushEvent(
@@ -346,6 +378,11 @@ const makeImpl = Effect.gen(function*() {
               truncated: false,
             }),
           );
+
+          return new CompleteTaskResult({
+            summary,
+            status: "completed",
+          });
         },
       );
 
@@ -382,13 +419,10 @@ const makeImpl = Effect.gen(function*() {
         yield* pushEvent(new AgentExecutorAssistantTextEvent({ text }));
       }
 
-      if (completionSummary !== null) {
-        yield* pushEvent(
-          new AgentExecutorCompletionEvent({
-            summary: completionSummary,
-            status: "completed",
-          }),
-        );
+      const completionEvent = toCompletionEvent(messages);
+
+      if (completionEvent !== null) {
+        yield* pushEvent(completionEvent);
       }
 
       return new AgentExecutorTurnResult({
@@ -405,6 +439,6 @@ const makeImpl = Effect.gen(function*() {
   );
 
   return AgentExecutor.of({ executeTurn }) satisfies AgentExecutorShape;
-}).pipe(Effect.provide(AgentExecutorToolRuntimeService));
+}).pipe(Effect.provide(AgentExecutorToolRuntimeService), Effect.provide(ProviderService));
 
 export const AgentExecutorAdapter = Layer.effect(AgentExecutor, makeImpl);
