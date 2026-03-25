@@ -3,10 +3,46 @@ import { Tool, Toolkit } from "effect/unstable/ai";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
-export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
-  message: Schema.String,
+export class ReadFileFailed extends Schema.TaggedErrorClass<ReadFileFailed>()("ReadFileFailed", {
+  filePath: Schema.String,
   cause: Schema.Defect,
+}) {}
+
+export class WriteFileFailed extends Schema.TaggedErrorClass<WriteFileFailed>()("WriteFileFailed", {
+  filePath: Schema.String,
+  cause: Schema.Defect,
+}) {}
+
+export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("CommandFailed", {
+  command: Schema.String,
+  cause: Schema.Defect,
+}) {}
+
+export const ToolkitFailureReason = Schema.Union([
+  ReadFileFailed,
+  WriteFileFailed,
+  CommandFailed,
+]);
+
+const formatToolkitFailure = (
+  reason: ReadFileFailed | WriteFileFailed | CommandFailed,
+): string => {
+  switch (reason._tag) {
+    case "ReadFileFailed":
+      return `Failed to read file: ${reason.filePath}`;
+    case "WriteFileFailed":
+      return `Failed to write file: ${reason.filePath}`;
+    case "CommandFailed":
+      return `Failed to execute command: ${reason.command}`;
+  }
+};
+
+export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
+  reason: ToolkitFailureReason,
 }) {
+  override get message(): string {
+    return formatToolkitFailure(this.reason);
+  }
 }
 
 export const ReadFileTool = Tool.make("readFile", {
@@ -92,18 +128,20 @@ const makeImpl = Effect.gen(function*() {
     function*({ filePath }: { filePath: string }) {
       yield* Effect.logDebug("Reading file", { filePath });
 
-      return yield* fs.readFileString(filePath);
+      return yield* fs.readFileString(filePath).pipe(
+        Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new ReadFileFailed({ filePath, cause }) }))),
+      );
     },
-    Effect.catch((error) => Effect.fail(new ToolkitError({ message: "Failed to read file", cause: error }))),
   );
 
   const writeFile = Effect.fn("toolkit.writeFile")(
     function*({ filePath, content }: { filePath: string; content: string }) {
       yield* Effect.logDebug("Writing file", { filePath, content });
 
-      return yield* fs.writeFileString(filePath, content);
+      return yield* fs.writeFileString(filePath, content).pipe(
+        Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new WriteFileFailed({ filePath, cause }) }))),
+      );
     },
-    Effect.catch((error) => Effect.fail(new ToolkitError({ message: "Failed to write file", cause: error }))),
   );
 
   const bash = Effect.fn("tools.bash")(
@@ -112,13 +150,14 @@ const makeImpl = Effect.gen(function*() {
 
       return yield* spawner.string(ChildProcess.make(command, { shell: true }), {
         includeStderr: true,
-      });
+      }).pipe(
+        Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new CommandFailed({ command, cause }) }))),
+      );
     },
-    Effect.catch((error) => Effect.fail(new ToolkitError({ message: "Failed to execute command", cause: error }))),
   );
 
   return AgentExecutorToolRuntime.of({ readFile, writeFile, bash });
-})
+});
 
 export const AgentExecutorToolRuntimeService = Layer.effect(
   AgentExecutorToolRuntime,

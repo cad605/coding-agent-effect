@@ -1,20 +1,59 @@
 import { type Effect, Schema, ServiceMap } from "effect";
-import type { Prompt } from "effect/unstable/ai";
 
-export class AgentExecutorError extends Schema.TaggedErrorClass<AgentExecutorError>()("AgentExecutorError", {
+import { AgentRunMessage, AgentRunState } from "./agent-runtime.ts";
+
+export class UnsupportedRuntimeMessage extends Schema.TaggedErrorClass<UnsupportedRuntimeMessage>()(
+  "UnsupportedRuntimeMessage",
+  {
+    role: Schema.String,
+  },
+) {}
+
+export class UnsupportedRuntimePart extends Schema.TaggedErrorClass<UnsupportedRuntimePart>()(
+  "UnsupportedRuntimePart",
+  {
+    partType: Schema.String,
+  },
+) {}
+
+export class ToolRuntimeFailed extends Schema.TaggedErrorClass<ToolRuntimeFailed>()("ToolRuntimeFailed", {
+  toolName: Schema.String,
   message: Schema.String,
+}) {}
+
+export class ModelTurnFailed extends Schema.TaggedErrorClass<ModelTurnFailed>()("ModelTurnFailed", {
   cause: Schema.Defect,
 }) {}
 
-export class ToolExecutionMetadata extends Schema.Class("ToolExecutionMetadata")({
-  durationMs: Schema.Number,
-  truncated: Schema.Boolean,
-}) {}
+export const AgentExecutorFailureReason = Schema.Union([
+  UnsupportedRuntimeMessage,
+  UnsupportedRuntimePart,
+  ToolRuntimeFailed,
+  ModelTurnFailed,
+]);
 
-export class AgentCompletion extends Schema.Class("AgentCompletion")({
-  summary: Schema.String,
-  status: Schema.Literal("completed"),
-}) {}
+const formatAgentExecutorFailure = (
+  reason: UnsupportedRuntimeMessage | UnsupportedRuntimePart | ToolRuntimeFailed | ModelTurnFailed,
+): string => {
+  switch (reason._tag) {
+    case "UnsupportedRuntimeMessage":
+      return `Unsupported runtime message role: ${reason.role}`;
+    case "UnsupportedRuntimePart":
+      return `Unsupported runtime message part type: ${reason.partType}`;
+    case "ToolRuntimeFailed":
+      return `Tool ${reason.toolName} failed: ${reason.message}`;
+    case "ModelTurnFailed":
+      return "Failed to execute turn";
+  }
+};
+
+export class AgentExecutorError extends Schema.TaggedErrorClass<AgentExecutorError>()("AgentExecutorError", {
+  reason: AgentExecutorFailureReason,
+}) {
+  override get message(): string {
+    return formatAgentExecutorFailure(this.reason);
+  }
+}
 
 export class AgentExecutorAssistantTextEvent extends Schema.TaggedClass("AgentExecutorAssistantTextEvent")(
   "AssistantText",
@@ -73,15 +112,24 @@ export type AgentExecutorEvent =
   | AgentExecutorToolFailureEvent
   | AgentExecutorCompletionEvent;
 
-export interface AgentExecutorTurn {
-  readonly prompt: Prompt.Prompt;
-  readonly events: ReadonlyArray<AgentExecutorEvent>;
+export class AgentExecutorTurnInput extends Schema.Class("AgentExecutorTurnInput")({
+  run: AgentRunState,
+}) {
+  declare readonly run: AgentRunState;
+}
+
+export class AgentExecutorTurnResult extends Schema.Class("AgentExecutorTurnResult")({
+  messages: Schema.Array(AgentRunMessage),
+  events: Schema.Array(AgentExecutorEvent),
+}) {
+  declare readonly messages: ReadonlyArray<AgentRunMessage>;
+  declare readonly events: ReadonlyArray<AgentExecutorEvent>;
 }
 
 export interface AgentExecutorShape {
   executeTurn(
-    { prompt }: { prompt: Prompt.Prompt },
-  ): Effect.Effect<AgentExecutorTurn, AgentExecutorError, never>;
+    input: AgentExecutorTurnInput,
+  ): Effect.Effect<AgentExecutorTurnResult, AgentExecutorError, never>;
 }
 
 export class AgentExecutor extends ServiceMap.Service<AgentExecutor, AgentExecutorShape>()(

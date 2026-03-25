@@ -1,5 +1,6 @@
 import { Effect, Match, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
+import { AgentRunInput } from "../ports/agent-runtime.ts";
 import { Agent } from "../ports/agent.ts";
 
 const renderToolInput = (input: string) => input;
@@ -19,15 +20,14 @@ const assistant = Command.make(
 
     yield* Effect.logDebug("Prompting agent", { prompt });
 
-    const events = yield* agent.send({ prompt });
+    const events = yield* agent.send(new AgentRunInput({ prompt, system: null }));
 
     yield* Effect.logDebug("Streaming agent response");
 
     yield* events.pipe(Stream.runForEach((event) =>
       Match.valueTags(event, {
         AgentText: (event) => terminal.display(event.text),
-        AgentToolCall: (event) =>
-          terminal.display(`[tool:${event.toolName}] start ${renderToolInput(event.input)}`),
+        AgentToolCall: (event) => terminal.display(`[tool:${event.toolName}] start ${renderToolInput(event.input)}`),
         AgentToolResult: (event) =>
           terminal.display(
             `[tool:${event.toolName}] done in ${event.durationMs}ms: ${renderToolOutput(event.output)}`,
@@ -36,8 +36,7 @@ const assistant = Command.make(
           terminal.display(
             `[tool:${event.toolName}] failed in ${event.durationMs}ms: ${event.message}`,
           ),
-        AgentCompletion: (event) =>
-          terminal.display(`Task complete: ${event.summary}`),
+        AgentCompletion: (event) => terminal.display(`Task complete: ${event.summary}`),
       })
     ));
 
