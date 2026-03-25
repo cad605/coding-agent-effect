@@ -20,18 +20,16 @@ export const mapExecutorEvent = (
         toolName,
         input,
       }),
-    ToolResult: ({ toolName, output, durationMs, truncated }) =>
+    ToolResult: ({ toolName, output, truncated }) =>
       new AgentToolResultEvent({
         toolName,
         output,
-        durationMs,
         truncated,
       }),
-    ToolFailure: ({ toolName, message, durationMs, truncated }) =>
+    ToolFailure: ({ toolName, message, truncated }) =>
       new AgentToolFailureEvent({
         toolName,
         message,
-        durationMs,
         truncated,
       }),
     Completion: ({ summary, status }) =>

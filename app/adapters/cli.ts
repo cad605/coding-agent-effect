@@ -30,11 +30,11 @@ const assistant = Command.make(
         AgentToolCall: (event) => terminal.display(`[tool:${event.toolName}] start ${renderToolInput(event.input)}`),
         AgentToolResult: (event) =>
           terminal.display(
-            `[tool:${event.toolName}] done in ${event.durationMs}ms: ${renderToolOutput(event.output)}`,
+            `[tool:${event.toolName}] done: ${renderToolOutput(event.output)}`,
           ),
         AgentToolFailure: (event) =>
           terminal.display(
-            `[tool:${event.toolName}] failed in ${event.durationMs}ms: ${event.message}`,
+            `[tool:${event.toolName}] failed: ${event.message}`,
           ),
         AgentCompletion: (event) => terminal.display(`Task complete: ${event.summary}`),
       })

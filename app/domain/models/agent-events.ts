@@ -12,14 +12,12 @@ export class AgentToolCallEvent extends Schema.TaggedClass("AgentToolCallEvent")
 export class AgentToolResultEvent extends Schema.TaggedClass("AgentToolResultEvent")("AgentToolResult", {
   toolName: Schema.String,
   output: Schema.NullOr(Schema.String),
-  durationMs: Schema.Number,
   truncated: Schema.Boolean,
 }) {}
 
 export class AgentToolFailureEvent extends Schema.TaggedClass("AgentToolFailureEvent")("AgentToolFailure", {
   toolName: Schema.String,
   message: Schema.String,
-  durationMs: Schema.Number,
   truncated: Schema.Boolean,
 }) {}
 
