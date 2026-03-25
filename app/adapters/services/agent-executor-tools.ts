@@ -118,6 +118,9 @@ export interface AgentExecutorToolRuntimeShape {
   readonly bash: (
     { command }: { command: string },
   ) => Effect.Effect<string, ToolkitError, never>;
+  readonly completeTask: (
+    { summary }: { summary: string },
+  ) => Effect.Effect<CompleteTaskResult, never, never>;
 }
 
 export class AgentExecutorToolRuntime extends ServiceMap.Service<
@@ -161,7 +164,13 @@ const makeImpl = Effect.gen(function*() {
     },
   );
 
-  return AgentExecutorToolRuntime.of({ readFile, writeFile, bash });
+  const completeTask = Effect.fn("toolkit.completeTask")(
+    function*({ summary }: { summary: string }) {
+      return new CompleteTaskResult({ summary, status: "completed" });
+    },
+  );
+
+  return AgentExecutorToolRuntime.of({ readFile, writeFile, bash, completeTask });
 });
 
 export const AgentExecutorToolRuntimeService = Layer.effect(

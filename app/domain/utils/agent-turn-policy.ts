@@ -1,6 +1,5 @@
-import { Match } from "effect";
 import { AgentError, MissingCompletionSignal, TurnBudgetExceeded } from "../errors/agent.ts";
-import type { AgentExecutorEvent, AgentExecutorTurnResult } from "../models/agent-executor.ts";
+import type { AgentExecutorTurnResult } from "../models/agent-executor.ts";
 
 export const MAX_TURNS = 24;
 
@@ -16,28 +15,10 @@ export const missingCompletionSignalError = (): AgentError =>
     reason: new MissingCompletionSignal({}),
   });
 
-export const isCompletionEvent = (
-  event: AgentExecutorEvent,
-): boolean =>
-  Match.value(event).pipe(
-    Match.when({ _tag: "Completion" }, () => true),
-    Match.orElse(() => false),
-  );
-
-export const isToolActivityEvent = (
-  event: AgentExecutorEvent,
-): boolean =>
-  Match.value(event).pipe(
-    Match.when({ _tag: "ToolCall" }, () => true),
-    Match.when({ _tag: "ToolResult" }, () => true),
-    Match.when({ _tag: "ToolFailure" }, () => true),
-    Match.orElse(() => false),
-  );
-
 export const turnHasCompletion = (
   turn: AgentExecutorTurnResult,
-): boolean => turn.events.some(isCompletionEvent);
+): boolean => turn.completed;
 
 export const turnHasToolActivity = (
   turn: AgentExecutorTurnResult,
-): boolean => turn.events.some(isToolActivityEvent);
+): boolean => turn.hadToolCall;
