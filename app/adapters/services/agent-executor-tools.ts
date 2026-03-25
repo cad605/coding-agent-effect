@@ -1,8 +1,6 @@
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
-
-import { Schema } from "effect";
 import { Tool, Toolkit as Tools } from "effect/unstable/ai";
 
 export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
@@ -11,7 +9,7 @@ export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("Toolk
 }) {
 }
 
-export const ReadFile = Tool.make("readFile", {
+export const ReadFileTool = Tool.make("readFile", {
   description: "Read and return the contents of a file",
   parameters: Schema.Struct({
     filePath: Schema.String.annotate({
@@ -23,7 +21,7 @@ export const ReadFile = Tool.make("readFile", {
   failureMode: "error",
 });
 
-export const WriteFile = Tool.make("writeFile", {
+export const WriteFileTool = Tool.make("writeFile", {
   description: "Write content to a file",
   parameters: Schema.Struct({
     filePath: Schema.String.annotate({
@@ -38,7 +36,7 @@ export const WriteFile = Tool.make("writeFile", {
   failureMode: "error",
 });
 
-export const Bash = Tool.make("bash", {
+export const BashTool = Tool.make("bash", {
   description: "Execute a shell command",
   parameters: Schema.Struct({
     command: Schema.String.annotate({
@@ -50,7 +48,41 @@ export const Bash = Tool.make("bash", {
   failureMode: "error",
 });
 
-export const AgentExecutorTools = Tools.make(ReadFile, WriteFile, Bash);
+export const CompleteTaskTool = Tool.make("completeTask", {
+  description: "Signal that the requested task is complete",
+  parameters: Schema.Struct({
+    summary: Schema.String.annotate({
+      description: "A concise final summary of the completed task",
+    }),
+  }),
+  success: Schema.Void,
+  failure: ToolkitError,
+  failureMode: "error",
+});
+
+export const AgentExecutorTools = Tools.make(
+  ReadFileTool,
+  WriteFileTool,
+  BashTool,
+  CompleteTaskTool,
+);
+
+export interface AgentExecutorToolRuntimeShape {
+  readonly readFile: (
+    { filePath }: { filePath: string },
+  ) => Effect.Effect<string, ToolkitError, never>;
+  readonly writeFile: (
+    { filePath, content }: { filePath: string; content: string },
+  ) => Effect.Effect<void, ToolkitError, never>;
+  readonly bash: (
+    { command }: { command: string },
+  ) => Effect.Effect<string, ToolkitError, never>;
+}
+
+export class AgentExecutorToolRuntime extends ServiceMap.Service<
+  AgentExecutorToolRuntime,
+  AgentExecutorToolRuntimeShape
+>()("app/adapters/AgentExecutorToolRuntime") {}
 
 const makeImpl = Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem;
@@ -85,7 +117,10 @@ const makeImpl = Effect.gen(function*() {
     Effect.catch((error) => Effect.fail(new ToolkitError({ message: "Failed to execute command", cause: error }))),
   );
 
-  return AgentExecutorTools.of({ readFile, writeFile, bash });
+  return AgentExecutorToolRuntime.of({ readFile, writeFile, bash });
 })
 
-export const AgentExecutorToolsService = AgentExecutorTools.toLayer(makeImpl);
+export const AgentExecutorToolRuntimeService = Layer.effect(
+  AgentExecutorToolRuntime,
+  makeImpl,
+);
