@@ -22,7 +22,6 @@ export class AgentExecutorToolResultEvent extends Schema.TaggedClass("AgentExecu
   {
     toolName: Schema.String,
     output: Schema.NullOr(Schema.String),
-    durationMs: Schema.Number,
     truncated: Schema.Boolean,
   },
 ) {}
@@ -32,7 +31,6 @@ export class AgentExecutorToolFailureEvent extends Schema.TaggedClass("AgentExec
   {
     toolName: Schema.String,
     message: Schema.String,
-    durationMs: Schema.Number,
     truncated: Schema.Boolean,
   },
 ) {}

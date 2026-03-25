@@ -1,5 +1,5 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Clock, Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Stream } from "effect";
 import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
 import {
@@ -297,11 +297,8 @@ const makeImpl = Effect.gen(function*() {
       const events: Array<AgentExecutorEvent> = [];
       const response: Array<Response.AnyPart> = [];
 
-      const pushEvent = Effect.fn("agent-executor.pushEvent")(function*(event: AgentExecutorEvent) {
-        return Effect.sync(() => {
-          events.push(event);
-        });
-      });
+      const pushEvent = (event: AgentExecutorEvent) =>
+        Effect.sync(() => { events.push(event); });
 
       const instrumentTool = <TInput extends object, TOutput>(
         { toolName, execute }: {
@@ -311,8 +308,6 @@ const makeImpl = Effect.gen(function*() {
       ) =>
         Effect.fn(`tool.${toolName}`)(
           function*(input: TInput) {
-            const startedAt = yield* Clock.currentTimeMillis;
-
             yield* pushEvent(
               new AgentExecutorToolCallEvent({
                 toolName,
@@ -326,31 +321,21 @@ const makeImpl = Effect.gen(function*() {
                   typeof result === "string" ? result : undefined,
                 );
 
-                return Clock.currentTimeMillis.pipe(
-                  Effect.flatMap((finishedAt) =>
-                    pushEvent(
-                      new AgentExecutorToolResultEvent({
-                        toolName,
-                        output: normalized.output,
-                        durationMs: finishedAt - startedAt,
-                        truncated: normalized.truncated,
-                      }),
-                    )
-                  ),
-                );
+                return pushEvent(
+                  new AgentExecutorToolResultEvent({
+                    toolName,
+                    output: normalized.output,
+                    truncated: normalized.truncated,
+                  }),
+                )
               }),
               Effect.tapError((error) =>
-                Clock.currentTimeMillis.pipe(
-                  Effect.flatMap((finishedAt) =>
-                    pushEvent(
-                      new AgentExecutorToolFailureEvent({
-                        toolName,
-                        message: error.message,
-                        durationMs: finishedAt - startedAt,
-                        truncated: false,
-                      }),
-                    )
-                  ),
+                pushEvent(
+                  new AgentExecutorToolFailureEvent({
+                    toolName,
+                    message: error.message,
+                    truncated: false,
+                  }),
                 )
               ),
             );
@@ -359,8 +344,6 @@ const makeImpl = Effect.gen(function*() {
 
       const completeTask = Effect.fn("tool.completeTask")(
         function*({ summary }: { summary: string }) {
-          const startedAt = yield* Clock.currentTimeMillis;
-
           yield* pushEvent(
             new AgentExecutorToolCallEvent({
               toolName: "completeTask",
@@ -368,13 +351,10 @@ const makeImpl = Effect.gen(function*() {
             }),
           );
 
-          const finishedAt = yield* Clock.currentTimeMillis;
-
           yield* pushEvent(
             new AgentExecutorToolResultEvent({
               toolName: "completeTask",
               output: null,
-              durationMs: finishedAt - startedAt,
               truncated: false,
             }),
           );
