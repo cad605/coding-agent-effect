@@ -415,7 +415,11 @@ const makeImpl = Effect.gen(function*() {
       "ToolkitError": (error) => Effect.fail(toolRuntimeFailed(error)),
       "AgentExecutorError": (error) => Effect.fail(error),
     }),
-    Effect.catch((cause) => Effect.fail(modelTurnFailed(cause))),
+    Effect.catch((cause) => 
+      Effect.logError("Unhandled executor error", { cause }).pipe(
+        Effect.andThen(Effect.fail(modelTurnFailed(cause)))
+      )
+    ),
   );
 
   return AgentExecutor.of({ executeTurn }) satisfies AgentExecutorShape;
