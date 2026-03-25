@@ -3,12 +3,13 @@
   "description": "Build your own Claude Code challenge, from CodeCrafters",
   "type": "module",
   "scripts": {
+    "setup": "bash scripts/setup.sh",
     "dev": "bun run app/main.ts",
-    "clean": "rimraf bun.lock node_modules apps/*/node_modules packages/*/node_modules .turbo apps/*/.turbo packages/*/.turbo",
-    "format:fix": "oxfmt",
-    "format:check": "oxfmt --check",
-    "lint:check": "oxlint && dprint check",
-    "lint:fix": "oxlint --fix && dprint fmt"
+    "clean": "rimraf bun.lock node_modules .repos .cursor",
+    "format:fix": "dprint fmt",
+    "format:check": "dprint check",
+    "lint:check": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "dependencies": {
     "@effect/ai-openrouter": "beta",
@@ -19,7 +20,6 @@
     "@effect/language-service": "0.80.0",
     "@types/bun": "1.3.10",
     "dprint": "0.53.0",
-    "oxfmt": "0.41.0",
     "oxlint": "1.56.0",
     "rimraf": "6.1.3",
     "typescript": "5.9.3"

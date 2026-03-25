@@ -1,21 +1,16 @@
-import { type Effect, type FileSystem, Schema, ServiceMap } from "effect";
-import { AiError } from "effect/unstable/ai";
-import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
+import { type Effect, Schema, ServiceMap } from "effect";
 
 export class AgentError extends Schema.TaggedErrorClass<AgentError>()("AgentError", {
-  reason: AiError.AiErrorReason,
-}) {
-  static fromAiError(error: AiError.AiError) {
-    return new AgentError({ reason: error.reason });
-  }
+  message: Schema.String,
+  cause: Schema.Defect,
+}) {}
+
+export interface AgentShape {
+  send(
+    { prompt }: { prompt: string },
+  ): Effect.Effect<string, AgentError, never>;
 }
 
-export type AgentShape = {
-  act(
-    prompt: string,
-  ): Effect.Effect<string, AgentError, FileSystem.FileSystem | ChildProcessSpawner>;
-};
-
 export class Agent extends ServiceMap.Service<Agent, AgentShape>()(
-  "@codecrafters/claude-code/Agent",
+  "app/ports/Agent",
 ) {}
