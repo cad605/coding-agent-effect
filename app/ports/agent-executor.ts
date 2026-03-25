@@ -1,5 +1,5 @@
 import { type Effect, Schema, ServiceMap } from "effect";
-import type * as Prompt from "effect/unstable/ai/Prompt";
+import type { Prompt } from "effect/unstable/ai";
 
 export class AgentExecutorError extends Schema.TaggedErrorClass<AgentExecutorError>()("AgentExecutorError", {
   message: Schema.String,

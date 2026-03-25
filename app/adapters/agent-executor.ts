@@ -1,11 +1,6 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import * as Effect from "effect/Effect";
-import { pipe } from "effect/Function";
-import * as Layer from "effect/Layer";
-import * as Stream from "effect/Stream";
-import * as LanguageModel from "effect/unstable/ai/LanguageModel";
-import * as Prompt from "effect/unstable/ai/Prompt";
-import type * as Response from "effect/unstable/ai/Response";
+import { Effect, Layer, pipe, Stream } from "effect";
+import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
 import {
   AgentExecutor,

@@ -1,9 +1,5 @@
-import * as Effect from "effect/Effect";
-import { pipe } from "effect/Function";
-import * as Layer from "effect/Layer";
-import * as Match from "effect/Match";
-import * as Stream from "effect/Stream";
-import * as Prompt from "effect/unstable/ai/Prompt";
+import { Effect, Layer, Match, pipe, Stream } from "effect";
+import { Prompt } from "effect/unstable/ai";
 
 import {
   AgentExecutor,

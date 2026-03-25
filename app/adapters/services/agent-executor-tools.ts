@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
+import { Tool, Toolkit } from "effect/unstable/ai";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
-import { Tool, Toolkit as Tools } from "effect/unstable/ai";
 
 export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
   message: Schema.String,
@@ -60,7 +60,7 @@ export const CompleteTaskTool = Tool.make("completeTask", {
   failureMode: "error",
 });
 
-export const AgentExecutorTools = Tools.make(
+export const AgentExecutorTools = Toolkit.make(
   ReadFileTool,
   WriteFileTool,
   BashTool,

@@ -1,5 +1,4 @@
-import { type Effect, Schema, ServiceMap } from "effect";
-import type * as Stream from "effect/Stream";
+import { type Effect, Schema, ServiceMap, type Stream } from "effect";
 
 export class AgentError extends Schema.TaggedErrorClass<AgentError>()("AgentError", {
   message: Schema.String,
