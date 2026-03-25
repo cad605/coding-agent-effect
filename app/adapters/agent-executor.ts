@@ -4,10 +4,7 @@ import { Chat } from "effect/unstable/ai";
 
 import { AgentExecutorError, ModelTurnFailed, ToolRuntimeFailed } from "../domain/errors/agent-executor.ts";
 import { AgentExecutorTurnResult } from "../domain/models/agent-executor.ts";
-import {
-  AssistantTextOutput,
-  CompletionOutput,
-} from "../domain/models/output.ts";
+import { AssistantTextOutput, CompletionOutput } from "../domain/models/output.ts";
 import { buildSessionMessages } from "../domain/utils/agent-run-state.ts";
 import { AgentExecutor } from "../ports/agent-executor.ts";
 import type { AgentExecutorSession, AgentExecutorShape } from "../ports/agent-executor.ts";
@@ -85,9 +82,7 @@ const makeImpl = Effect.gen(function*() {
           );
 
           const text = yield* chat.streamText({ prompt: [], toolkit }).pipe(
-            Stream.runFold(() => "", (acc, part) =>
-              part.type === "text-delta" ? acc + part.delta : acc
-            ),
+            Stream.runFold(() => "", (acc, part) => part.type === "text-delta" ? acc + part.delta : acc),
           );
 
           if (text.trim().length > 0) {

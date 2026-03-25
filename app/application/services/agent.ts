@@ -1,6 +1,7 @@
 import { Effect, Layer, Queue, Stream } from "effect";
 
 import type { AgentError } from "../../domain/errors/agent.ts";
+import type { Output } from "../../domain/models/output.ts";
 import { mapAgentExecutorError } from "../../domain/utils/agent-error-mapper.ts";
 import {
   hasReachedTurnBudget,
@@ -9,7 +10,6 @@ import {
   turnHasCompletion,
   turnHasToolActivity,
 } from "../../domain/utils/agent-turn-policy.ts";
-import type { Output } from "../../domain/models/output.ts";
 import { AgentExecutor } from "../../ports/agent-executor.ts";
 import type { AgentExecutorSession } from "../../ports/agent-executor.ts";
 import { Agent, type AgentShape } from "../../ports/agent.ts";
