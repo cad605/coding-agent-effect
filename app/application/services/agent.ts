@@ -55,8 +55,6 @@ const makeImpl = Effect.gen(function*() {
         const session = yield* executor.createSession(
           input,
           (output) => Queue.offer(queue, output),
-        ).pipe(
-          Effect.catchTag("AgentExecutorError", (error) => Effect.fail(mapAgentExecutorError(error))),
         );
 
         yield* runAgentLoop({ session, turns: 0 }).pipe(
@@ -66,7 +64,9 @@ const makeImpl = Effect.gen(function*() {
           }),
           Effect.forkScoped,
         );
-      })
+      }).pipe(
+        Effect.catchTag("AgentExecutorError", (error) => Effect.fail(mapAgentExecutorError(error))),
+      )
     );
   });
 

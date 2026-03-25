@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Schema, ServiceMap } from "effect";
+import { Effect, FileSystem, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
@@ -105,27 +105,7 @@ export const AgentExecutorTools = Toolkit.make(
   CompleteTaskTool,
 );
 
-export interface AgentExecutorToolRuntimeShape {
-  readonly readFile: (
-    { filePath }: { filePath: string },
-  ) => Effect.Effect<string, ToolkitError, never>;
-  readonly writeFile: (
-    { filePath, content }: { filePath: string; content: string },
-  ) => Effect.Effect<void, ToolkitError, never>;
-  readonly bash: (
-    { command }: { command: string },
-  ) => Effect.Effect<string, ToolkitError, never>;
-  readonly completeTask: (
-    { summary }: { summary: string },
-  ) => Effect.Effect<CompleteTaskResult, never, never>;
-}
-
-export class AgentExecutorToolRuntime extends ServiceMap.Service<
-  AgentExecutorToolRuntime,
-  AgentExecutorToolRuntimeShape
->()("app/adapters/AgentExecutorToolRuntime") {}
-
-const makeImpl = Effect.gen(function*() {
+export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem;
   const spawner = yield* ChildProcessSpawner;
 
@@ -164,10 +144,10 @@ const makeImpl = Effect.gen(function*() {
     },
   );
 
-  return AgentExecutorToolRuntime.of({ readFile, writeFile, bash, completeTask });
-});
-
-export const AgentExecutorToolRuntimeService = Layer.effect(
-  AgentExecutorToolRuntime,
-  makeImpl,
-);
+  return AgentExecutorTools.of({
+    readFile,
+    writeFile,
+    bash,
+    completeTask,
+  });
+}));
