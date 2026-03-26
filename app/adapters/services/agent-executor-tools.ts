@@ -121,10 +121,10 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
   const writeFile = Effect.fn("toolkit.writeFile")(
     function*({ filePath, content }: { filePath: string; content: string }) {
       yield* Effect.logDebug("Writing file", { filePath, content });
-      
+
       yield* fs.writeFileString(filePath, content);
-      
-      return Effect.void
+
+      return Effect.void;
     },
     Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new WriteFileFailed({ cause }) }))),
   );

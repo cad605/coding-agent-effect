@@ -1,5 +1,5 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Match, Stream } from "effect";
 import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
 import { AgentExecutorError, ModelTurnFailed } from "../domain/errors/agent-executor.ts";
@@ -29,47 +29,42 @@ const makeImpl = Effect.gen(function*() {
       let hadToolCall = false;
       let completionSummary: string | null = null;
 
+      const matchType = Match.discriminator("type");
+
       return LanguageModel.streamText({ prompt, toolkit }).pipe(
         Stream.flatMap((part) => {
           responseParts.push(part);
-          const events: Array<TurnEvent> = [];
 
-          switch (part.type) {
-            case "text-delta":
-            case "reasoning-delta":
-              text += part.delta;
-              events.push(new TextDelta({ delta: part.delta }));
-              break;
-            case "tool-call":
+          const events = Match.value(part).pipe(
+            matchType("text-delta", "reasoning-delta", (p): Array<TurnEvent> => {
+              text += p.delta;
+              return [new TextDelta({ delta: p.delta })];
+            }),
+            matchType("tool-call", (p) => {
               hadToolCall = true;
-              events.push(new ToolCallStart({ toolName: part.name, toolCallId: part.id }));
-              break;
-            case "tool-result":
-              if (!part.preliminary) {
-                if (part.result instanceof CompleteTaskResult) {
-                  completionSummary = part.result.summary;
-                }
-                events.push(
-                  new ToolResult({
-                    toolName: part.name,
-                    toolCallId: part.id,
-                    output: String(part.result),
-                    isFailure: part.isFailure,
-                  }),
-                );
+              return [new ToolCallStart({ toolName: p.name, toolCallId: p.id })];
+            }),
+            matchType("tool-result", (p) => {
+              if (p.result instanceof CompleteTaskResult) {
+                completionSummary = p.result.summary;
               }
-              break;
-            case "finish": {
-              const usage = part.usage;
-              events.push(
-                new UsageReport({
-                  inputTokens: usage.inputTokens.total ?? 0,
-                  outputTokens: usage.outputTokens.total ?? 0,
+              return [
+                new ToolResult({
+                  toolName: p.name,
+                  toolCallId: p.id,
+                  output: String(p.result),
+                  isFailure: p.isFailure,
                 }),
-              );
-              break;
-            }
-          }
+              ];
+            }),
+            matchType("finish", (p) => [
+              new UsageReport({
+                inputTokens: p.usage.inputTokens.total ?? 0,
+                outputTokens: p.usage.outputTokens.total ?? 0,
+              }),
+            ]),
+            Match.orElse(() => []),
+          );
 
           return Stream.fromIterable(events);
         }),
