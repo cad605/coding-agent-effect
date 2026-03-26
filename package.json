@@ -12,9 +12,9 @@
     "lint:fix": "oxlint --fix"
   },
   "dependencies": {
-    "@effect/ai-openrouter": "beta",
-    "@effect/platform-bun": "beta",
-    "effect": "beta"
+    "@effect/ai-openrouter": "4.0.0-beta.38",
+    "@effect/platform-bun": "4.0.0-beta.38",
+    "effect": "4.0.0-beta.38"
   },
   "devDependencies": {
     "@effect/language-service": "0.80.0",
