@@ -1,97 +1,107 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Effect, Layer, Match, MutableRef, Stream } from "effect";
-import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
+import { Effect, Layer, Ref, Stream } from "effect";
+import { Chat, Prompt } from "effect/unstable/ai";
 
 import { AgentExecutorError, ModelTurnFailed } from "../domain/errors/agent-executor.ts";
 import {
+  ReasoningDelta,
+  ReasoningEnd,
   TextDelta,
+  TextEnd,
   ToolCallStart,
   ToolResult,
   TurnComplete,
   type TurnEvent,
   UsageReport,
 } from "../domain/models/agent-executor.ts";
-import { AgentExecutor } from "../ports/agent-executor.ts";
-import type { AgentExecutorShape } from "../ports/agent-executor.ts";
+import { AgentExecutor, type AgentExecutorShape } from "../ports/agent-executor.ts";
 import { AgentExecutorTools, AgentExecutorToolsService } from "./services/agent-executor-tools.ts";
 import { ProviderService } from "./services/provider.ts";
 
 const makeImpl = Effect.gen(function*() {
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
-  const history = MutableRef.make(Prompt.empty);
 
-  const executeTurn: AgentExecutorShape["executeTurn"] = Effect.fn("agent-executor.executeTurn")(
-    function*(input) {
-      yield* Effect.logDebug("Executing agent turn", { input });
+  const primary = yield* Chat.fromPrompt(Prompt.empty);
 
-      if (input.systemPrompt !== null) {
-        MutableRef.update(history, Prompt.setSystem(input.systemPrompt));
-      }
-      if (input.userMessage !== null) {
-        MutableRef.update(history, Prompt.concat(Prompt.make(input.userMessage)));
-      }
+  const createExecutor = (chat: Chat.Service): AgentExecutorShape => ({
+    streamTurn: Effect.fn("agent-executor.streamTurn")(
+      function*(options) {
+        if (options.systemPrompt) {
+          yield* Ref.update(chat.history, Prompt.setSystem(options.systemPrompt));
+        }
 
-      const responseParts: Array<Response.AnyPart> = [];
-      let text = "";
-      let hadToolCall = false;
+        const prompt = options.userMessage ?? [];
 
-      const matchType = Match.discriminator("type");
+        let text = "";
+        let hadToolCall = false;
 
-      return LanguageModel.streamText({ prompt: MutableRef.get(history), toolkit }).pipe(
-        Stream.flatMap((part) => {
-          responseParts.push(part);
-
-          const events = Match.value(part).pipe(
-            matchType("text-delta", "reasoning-delta", (p): Array<TurnEvent> => {
-              text += p.delta;
-              return [new TextDelta({ delta: p.delta })];
-            }),
-            matchType("tool-call", (p) => {
-              hadToolCall = true;
-              return [new ToolCallStart({ toolName: p.name, toolCallId: p.id })];
-            }),
-            matchType("tool-result", (p) => [
-              new ToolResult({
-                toolName: p.name,
-                toolCallId: p.id,
-                output: String(p.result),
-                isFailure: p.isFailure,
-              }),
-            ]),
-            matchType("finish", (p) => [
-              new UsageReport({
-                inputTokens: p.usage.inputTokens.total ?? 0,
-                outputTokens: p.usage.outputTokens.total ?? 0,
-              }),
-            ]),
-            Match.orElse(() => []),
-          );
-
-          return Stream.fromIterable(events);
-        }),
-        Stream.concat(Stream.suspend(() => {
-          MutableRef.update(history, Prompt.concat(Prompt.fromResponseParts(responseParts)));
-          
-          return Stream.make(new TurnComplete({ hadToolCall, text }));
-        })),
-      );
-    },
-    Stream.unwrap,
-    (stream) =>
-      stream.pipe(
-        Stream.provide(model),
-        Stream.catch((cause) =>
-          Stream.fail(
-            new AgentExecutorError({
-              reason: new ModelTurnFailed({ cause }),
-            }),
-          )
+        return chat.streamText({ prompt, toolkit }).pipe(
+          Stream.flatMap((part) => {
+            const events: Array<TurnEvent> = [];
+            switch (part.type) {
+              case "text-delta":
+                text += part.delta;
+                events.push(new TextDelta({ delta: part.delta }));
+                break;
+              case "text-end":
+                events.push(new TextEnd());
+                break;
+              case "reasoning-delta":
+                text += part.delta;
+                events.push(new ReasoningDelta({ delta: part.delta }));
+                break;
+              case "reasoning-end":
+                events.push(new ReasoningEnd());
+                break;
+              case "tool-call":
+                hadToolCall = true;
+                events.push(new ToolCallStart({ toolName: part.name, toolCallId: part.id }));
+                break;
+              case "tool-result":
+                events.push(
+                  new ToolResult({
+                    toolName: part.name,
+                    toolCallId: part.id,
+                    output: String(part.result),
+                    isFailure: part.isFailure,
+                  }),
+                );
+                break;
+              case "finish":
+                events.push(
+                  new UsageReport({
+                    inputTokens: part.usage.inputTokens.total ?? 0,
+                    outputTokens: part.usage.outputTokens.total ?? 0,
+                  }),
+                );
+                break;
+            }
+            return Stream.fromIterable(events);
+          }),
+          Stream.concat(Stream.suspend(() => Stream.make(new TurnComplete({ hadToolCall, text })))),
+        );
+      },
+      Stream.unwrap,
+      (stream) =>
+        stream.pipe(
+          Stream.provide(model),
+          Stream.catch((cause) => Stream.fail(new AgentExecutorError({ reason: new ModelTurnFailed({ cause }) }))),
         ),
-      ),
-  );
+    ),
 
-  return AgentExecutor.of({ executeTurn }) satisfies AgentExecutorShape;
+    fork: Effect.fn(function*() {
+      const subChat = yield* Chat.empty;
+      return createExecutor(subChat);
+    }, Effect.mapError((cause) => new AgentExecutorError({ reason: new ModelTurnFailed({ cause }) }))),
+
+    exportJson: chat.exportJson.pipe(
+      Effect.mapError((cause) => new AgentExecutorError({ reason: new ModelTurnFailed({ cause }) })),
+    ),
+  });
+
+  
+  return AgentExecutor.of(createExecutor(primary));
 }).pipe(Effect.provide(AgentExecutorToolsService), Effect.provide(ProviderService));
 
 export const AgentExecutorAdapter = Layer.effect(AgentExecutor, makeImpl);

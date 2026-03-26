@@ -6,17 +6,17 @@ An AI coding assistant implementation in TypeScript, built with [Effect](https:/
 
 ## Supported Commands
 
-| Command | Description |
-|---------|-------------|
+| Command                 | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
 | `assistant -p <prompt>` | Send a prompt to the coding assistant and receive a response |
 
 ### Tools Available to the Agent
 
-| Tool | Description |
-|------|-------------|
-| `readFile` | Read the contents of a file |
-| `writeFile` | Write content to a file |
-| `bash` | Execute shell commands |
+| Tool        | Description                 |
+| ----------- | --------------------------- |
+| `readFile`  | Read the contents of a file |
+| `writeFile` | Write content to a file     |
+| `bash`      | Execute shell commands      |
 
 ## Getting Started
 
@@ -46,10 +46,10 @@ bun run app/main.ts assistant -p "your prompt here"
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENROUTER_API_KEY` | Yes | API key for OpenRouter |
-| `OPENROUTER_BASE_URL` | No | Custom base URL (defaults to `https://openrouter.ai/api/v1`) |
+| Variable              | Required | Description                                                  |
+| --------------------- | -------- | ------------------------------------------------------------ |
+| `OPENROUTER_API_KEY`  | Yes      | API key for OpenRouter                                       |
+| `OPENROUTER_BASE_URL` | No       | Custom base URL (defaults to `https://openrouter.ai/api/v1`) |
 
 ## Architecture
 
@@ -116,24 +116,24 @@ app/
 
 ## Tech Stack
 
-| Concern | Tool |
-|---------|------|
-| Runtime | [Bun](https://bun.sh) |
-| Language | TypeScript (strict mode) |
-| Core library | [Effect](https://effect.website) (layers, services, schemas, CLI, streams) |
-| LLM provider | [OpenRouter](https://openrouter.ai) via `@effect/ai-openrouter` |
-| Linting | [oxlint](https://oxc.rs) |
-| Formatting | [dprint](https://dprint.dev) |
-| Type checking | `tsc` (no emit) |
+| Concern       | Tool                                                                       |
+| ------------- | -------------------------------------------------------------------------- |
+| Runtime       | [Bun](https://bun.sh)                                                      |
+| Language      | TypeScript (strict mode)                                                   |
+| Core library  | [Effect](https://effect.website) (layers, services, schemas, CLI, streams) |
+| LLM provider  | [OpenRouter](https://openrouter.ai) via `@effect/ai-openrouter`            |
+| Linting       | [oxlint](https://oxc.rs)                                                   |
+| Formatting    | [dprint](https://dprint.dev)                                               |
+| Type checking | `tsc` (no emit)                                                            |
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
-| `bun run setup` | Install dependencies and clone reference repos |
-| `bun run dev` | Run the CLI (`bun run app/main.ts`) |
-| `bun run clean` | Remove `bun.lock`, `node_modules`, `.repos`, and `.cursor` |
-| `bun run format:fix` | Auto-format with dprint |
-| `bun run format:check` | Check formatting without modifying files |
-| `bun run lint:check` | Run oxlint and type checking |
-| `bun run lint:fix` | Auto-fix lint issues with oxlint |
+| Script                 | Description                                                |
+| ---------------------- | ---------------------------------------------------------- |
+| `bun run setup`        | Install dependencies and clone reference repos             |
+| `bun run dev`          | Run the CLI (`bun run app/main.ts`)                        |
+| `bun run clean`        | Remove `bun.lock`, `node_modules`, `.repos`, and `.cursor` |
+| `bun run format:fix`   | Auto-format with dprint                                    |
+| `bun run format:check` | Check formatting without modifying files                   |
+| `bun run lint:check`   | Run oxlint and type checking                               |
+| `bun run lint:fix`     | Auto-fix lint issues with oxlint                           |

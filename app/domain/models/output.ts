@@ -28,4 +28,10 @@ export class CompletionOutput extends Schema.TaggedClass("CompletionOutput")("Co
 
 export type Output = AgentTextDelta | AgentToolCallStart | AgentToolResult | AgentUsageReport | CompletionOutput;
 
-export const Output = Schema.Union([AgentTextDelta, AgentToolCallStart, AgentToolResult, AgentUsageReport, CompletionOutput]);
+export const Output = Schema.Union([
+  AgentTextDelta,
+  AgentToolCallStart,
+  AgentToolResult,
+  AgentUsageReport,
+  CompletionOutput,
+]);

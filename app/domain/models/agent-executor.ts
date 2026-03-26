@@ -1,13 +1,16 @@
 import { Schema } from "effect";
 
-export class TurnInput extends Schema.TaggedClass("TurnInput")("TurnInput", {
-  userMessage: Schema.NullOr(Schema.String),
-  systemPrompt: Schema.NullOr(Schema.String),
-}) {}
-
 export class TextDelta extends Schema.TaggedClass("TextDelta")("TextDelta", {
   delta: Schema.String,
 }) {}
+
+export class TextEnd extends Schema.TaggedClass("TextEnd")("TextEnd", {}) {}
+
+export class ReasoningDelta extends Schema.TaggedClass("ReasoningDelta")("ReasoningDelta", {
+  delta: Schema.String,
+}) {}
+
+export class ReasoningEnd extends Schema.TaggedClass("ReasoningEnd")("ReasoningEnd", {}) {}
 
 export class ToolCallStart extends Schema.TaggedClass("ToolCallStart")("ToolCallStart", {
   toolName: Schema.String,
@@ -31,5 +34,23 @@ export class TurnComplete extends Schema.TaggedClass("TurnComplete")("TurnComple
   text: Schema.String,
 }) {}
 
-export type TurnEvent = TextDelta | ToolCallStart | ToolResult | UsageReport | TurnComplete;
-export const TurnEvent = Schema.Union([TextDelta, ToolCallStart, ToolResult, UsageReport, TurnComplete]);
+export type TurnEvent =
+  | TextDelta
+  | TextEnd
+  | ReasoningDelta
+  | ReasoningEnd
+  | ToolCallStart
+  | ToolResult
+  | UsageReport
+  | TurnComplete;
+
+export const TurnEvent = Schema.Union([
+  TextDelta,
+  TextEnd,
+  ReasoningDelta,
+  ReasoningEnd,
+  ToolCallStart,
+  ToolResult,
+  UsageReport,
+  TurnComplete,
+]);

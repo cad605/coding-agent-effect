@@ -1,7 +1,7 @@
 import { type Cause, Effect, Layer, Match, Queue, Semaphore, Stream } from "effect";
 
 import { AgentError, ExecuteTurnFailed, ModelExecutionFailed, TurnBudgetExceeded } from "../../domain/errors/agent.ts";
-import { TurnComplete, TurnInput } from "../../domain/models/agent-executor.ts";
+import { TurnComplete } from "../../domain/models/agent-executor.ts";
 import {
   AgentTextDelta,
   AgentToolCallStart,
@@ -39,19 +39,23 @@ const makeImpl = Effect.gen(function*() {
             return yield* new AgentError({ reason: new TurnBudgetExceeded({ maxTurns: MAX_TURNS }) });
           }
 
-          const turnInput = turns === 0
-            ? new TurnInput({ userMessage: input.prompt, systemPrompt: input.system ?? DEFAULT_SYSTEM_PROMPT })
-            : new TurnInput({ userMessage: null, systemPrompt: null });
+          const turnOptions = turns === 0
+            ? { userMessage: input.prompt, systemPrompt: input.system ?? DEFAULT_SYSTEM_PROMPT }
+            : { userMessage: null, systemPrompt: null };
 
           let turnComplete: TurnComplete | undefined;
 
-          yield* executor.executeTurn(turnInput).pipe(
+          yield* executor.streamTurn(turnOptions).pipe(
             Stream.runForEach((event) => {
               if (event._tag === "TurnComplete") {
                 turnComplete = event;
                 return Effect.void;
               }
-              
+
+              if (event._tag === "TextEnd" || event._tag === "ReasoningEnd" || event._tag === "ReasoningDelta") {
+                return Effect.void;
+              }
+
               const output: Output = Match.valueTags(event, {
                 TextDelta: (e) => new AgentTextDelta({ delta: e.delta }),
                 ToolCallStart: (e) => new AgentToolCallStart({ toolName: e.toolName, toolCallId: e.toolCallId }),
@@ -64,9 +68,9 @@ const makeImpl = Effect.gen(function*() {
                   }),
                 UsageReport: (e) => new AgentUsageReport({ inputTokens: e.inputTokens, outputTokens: e.outputTokens }),
               });
-              
+
               Queue.offer(queue, output);
-              
+
               return Effect.void;
             }),
             Effect.catchTag(
