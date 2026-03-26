@@ -1,12 +1,11 @@
 import { ServiceMap, type Stream } from "effect";
-import type { Prompt } from "effect/unstable/ai";
 
 import type { AgentExecutorError } from "../domain/errors/agent-executor.ts";
-import type { TurnEvent } from "../domain/models/agent-executor.ts";
+import type { TurnEvent, TurnInput } from "../domain/models/agent-executor.ts";
 
 export interface AgentExecutorShape {
   executeTurn(
-    prompt: Prompt.Prompt,
+    input: TurnInput,
   ): Stream.Stream<TurnEvent, AgentExecutorError>;
 }
 

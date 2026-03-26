@@ -1,5 +1,9 @@
 import { Schema } from "effect";
-import { Prompt } from "effect/unstable/ai";
+
+export class TurnInput extends Schema.TaggedClass("TurnInput")("TurnInput", {
+  userMessage: Schema.NullOr(Schema.String),
+  systemPrompt: Schema.NullOr(Schema.String),
+}) {}
 
 export class TextDelta extends Schema.TaggedClass("TextDelta")("TextDelta", {
   delta: Schema.String,
@@ -25,7 +29,6 @@ export class UsageReport extends Schema.TaggedClass("UsageReport")("UsageReport"
 export class TurnComplete extends Schema.TaggedClass("TurnComplete")("TurnComplete", {
   hadToolCall: Schema.Boolean,
   text: Schema.String,
-  promptDelta: Prompt.Prompt,
 }) {}
 
 export type TurnEvent = TextDelta | ToolCallStart | ToolResult | UsageReport | TurnComplete;

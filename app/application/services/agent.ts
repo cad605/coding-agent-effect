@@ -1,8 +1,7 @@
-import { type Cause, Effect, Layer, MutableRef, Queue, Semaphore, Stream } from "effect";
-import { Prompt } from "effect/unstable/ai";
+import { type Cause, Effect, Layer, Queue, Semaphore, Stream } from "effect";
 
 import { AgentError, ExecuteTurnFailed, ModelExecutionFailed, TurnBudgetExceeded } from "../../domain/errors/agent.ts";
-import { TurnComplete } from "../../domain/models/agent-executor.ts";
+import { TurnComplete, TurnInput } from "../../domain/models/agent-executor.ts";
 import { CompletionOutput, type Output } from "../../domain/models/output.ts";
 
 import { AgentExecutor } from "../../ports/agent-executor.ts";
@@ -18,15 +17,11 @@ const DEFAULT_SYSTEM_PROMPT = [
 const makeImpl = Effect.gen(function*() {
   const executor = yield* AgentExecutor;
 
-  const history = MutableRef.make(Prompt.empty);
   const sendLock = Semaphore.makeUnsafe(1);
 
   const send: AgentShape["send"] = Effect.fn("agent.send")(
     function*(input) {
       yield* Effect.logDebug("Sending agent input", { input });
-
-      MutableRef.update(history, Prompt.setSystem(input.system ?? DEFAULT_SYSTEM_PROMPT));
-      MutableRef.update(history, Prompt.concat(Prompt.make(input.prompt)));
 
       const queue = yield* Queue.make<Output, AgentError | Cause.Done>();
 
@@ -37,9 +32,13 @@ const makeImpl = Effect.gen(function*() {
             return yield* new AgentError({ reason: new TurnBudgetExceeded({ maxTurns: MAX_TURNS }) });
           }
 
+          const turnInput = turns === 0
+            ? new TurnInput({ userMessage: input.prompt, systemPrompt: input.system ?? DEFAULT_SYSTEM_PROMPT })
+            : new TurnInput({ userMessage: null, systemPrompt: null });
+
           let turnComplete: TurnComplete | undefined;
 
-          yield* executor.executeTurn(MutableRef.get(history)).pipe(
+          yield* executor.executeTurn(turnInput).pipe(
             Stream.runForEach((event) => {
               if (event._tag === "TurnComplete") {
                 turnComplete = event;
@@ -55,7 +54,6 @@ const makeImpl = Effect.gen(function*() {
                   turnComplete = new TurnComplete({
                     hadToolCall: false,
                     text: "",
-                    promptDelta: Prompt.empty,
                   });
                   return Effect.void;
                 }
@@ -67,7 +65,6 @@ const makeImpl = Effect.gen(function*() {
           );
 
           const turn = turnComplete!;
-          MutableRef.update(history, Prompt.concat(turn.promptDelta));
 
           if (!turn.hadToolCall) {
             yield* Queue.offer(queue, new CompletionOutput({ summary: turn.text, status: "completed" }));

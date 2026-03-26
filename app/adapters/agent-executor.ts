@@ -1,5 +1,5 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Effect, Layer, Match, Stream } from "effect";
+import { Effect, Layer, Match, MutableRef, Stream } from "effect";
 import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
 import { AgentExecutorError, ModelTurnFailed } from "../domain/errors/agent-executor.ts";
@@ -19,10 +19,18 @@ import { ProviderService } from "./services/provider.ts";
 const makeImpl = Effect.gen(function*() {
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
+  const history = MutableRef.make(Prompt.empty);
 
   const executeTurn: AgentExecutorShape["executeTurn"] = Effect.fn("agent-executor.executeTurn")(
-    function*(prompt) {
-      yield* Effect.logDebug("Executing agent turn");
+    function*(input) {
+      yield* Effect.logDebug("Executing agent turn", { input });
+
+      if (input.systemPrompt !== null) {
+        MutableRef.update(history, Prompt.setSystem(input.systemPrompt));
+      }
+      if (input.userMessage !== null) {
+        MutableRef.update(history, Prompt.concat(Prompt.make(input.userMessage)));
+      }
 
       const responseParts: Array<Response.AnyPart> = [];
       let text = "";
@@ -30,7 +38,7 @@ const makeImpl = Effect.gen(function*() {
 
       const matchType = Match.discriminator("type");
 
-      return LanguageModel.streamText({ prompt, toolkit }).pipe(
+      return LanguageModel.streamText({ prompt: MutableRef.get(history), toolkit }).pipe(
         Stream.flatMap((part) => {
           responseParts.push(part);
 
@@ -62,15 +70,10 @@ const makeImpl = Effect.gen(function*() {
 
           return Stream.fromIterable(events);
         }),
-        Stream.concat(Stream.suspend(() =>
-          Stream.make(
-            new TurnComplete({
-              hadToolCall,
-              text,
-              promptDelta: Prompt.fromResponseParts(responseParts),
-            }),
-          )
-        )),
+        Stream.concat(Stream.suspend(() => {
+          MutableRef.update(history, Prompt.concat(Prompt.fromResponseParts(responseParts)));
+          return Stream.make(new TurnComplete({ hadToolCall, text }));
+        })),
       );
     },
     Stream.unwrap,
