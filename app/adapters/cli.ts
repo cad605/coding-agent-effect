@@ -27,7 +27,7 @@ const assistant = Command.make(
           AgentToolCallStart: () => Effect.void,
           AgentToolResult: () => Effect.void,
           AgentUsageReport: () => Effect.void,
-          Completion: (event) => terminal.display(`${event.summary}\n`),
+          Completion: ({ summary }) => terminal.display(`${summary}\n`),
         })
       ),
     );

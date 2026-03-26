@@ -1,5 +1,5 @@
 {
-  "name": "@codecrafters/claude-code",
+  "name": "coding-agent-effect",
   "description": "Build your own Claude Code challenge, from CodeCrafters",
   "type": "module",
   "scripts": {
