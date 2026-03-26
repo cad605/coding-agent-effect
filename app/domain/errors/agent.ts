@@ -4,15 +4,9 @@ export class TurnBudgetExceeded extends Schema.TaggedErrorClass<TurnBudgetExceed
   maxTurns: Schema.Number,
 }) {}
 
-export class ToolExecutionFailed extends Schema.TaggedErrorClass<ToolExecutionFailed>()("ToolExecutionFailed", {
-  toolName: Schema.String,
-  message: Schema.String,
-}) {}
-
 export class ModelExecutionFailed extends Schema.TaggedErrorClass<ModelExecutionFailed>()("ModelExecutionFailed", {}) {}
 
 export const AgentTurnFailureReason = Schema.Union([
-  ToolExecutionFailed,
   ModelExecutionFailed,
 ]);
 

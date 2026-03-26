@@ -19,7 +19,7 @@ const assistant = Command.make(
     yield* Effect.logDebug("Prompting agent", { prompt });
 
     yield* pipe(
-      agent.send(new AgentRunInput({ prompt, system: null, session: null })),
+      agent.send(new AgentRunInput({ prompt, system: null })),
       Stream.unwrap,
       Stream.runForEach((event: Output) =>
         Match.valueTags(event, {
