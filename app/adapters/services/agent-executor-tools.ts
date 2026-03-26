@@ -15,15 +15,6 @@ export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("Com
   cause: Schema.Defect,
 }) {}
 
-export const ToolkitFailureReason = Schema.Union([
-  ReadFileFailed,
-  WriteFileFailed,
-  CommandFailed,
-]);
-export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
-  reason: ToolkitFailureReason,
-}) {}
-
 export const ReadFileTool = Tool.make("readFile", {
   description: "Read and return the contents of a file",
   parameters: Schema.Struct({
@@ -32,7 +23,7 @@ export const ReadFileTool = Tool.make("readFile", {
     }),
   }),
   success: Schema.String,
-  failure: ToolkitError,
+  failure: ReadFileFailed,
   failureMode: "return",
 });
 
@@ -47,7 +38,7 @@ export const WriteFileTool = Tool.make("writeFile", {
     }),
   }),
   success: Schema.String,
-  failure: ToolkitError,
+  failure: WriteFileFailed,
   failureMode: "return",
 });
 
@@ -59,7 +50,7 @@ export const BashTool = Tool.make("bash", {
     }),
   }),
   success: Schema.String,
-  failure: ToolkitError,
+  failure: CommandFailed,
   failureMode: "return",
 });
 
@@ -79,7 +70,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
 
       return yield* fs.readFileString(filePath);
     },
-    Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new ReadFileFailed({ cause }) }))),
+    Effect.catch((cause) => Effect.fail(new ReadFileFailed({ cause }))),
   );
 
   const writeFile = Effect.fn("toolkit.writeFile")(
@@ -90,7 +81,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
 
       return "File written successfully.";
     },
-    Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new WriteFileFailed({ cause }) }))),
+    Effect.catch((cause) => Effect.fail(new WriteFileFailed({ cause }))),
   );
 
   const bash = Effect.fn("tools.bash")(
@@ -101,7 +92,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
         includeStderr: true,
       });
     },
-    Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new CommandFailed({ cause }) }))),
+    Effect.catch((cause) => Effect.fail(new CommandFailed({ cause }))),
   );
 
   return AgentExecutorTools.of({

@@ -72,6 +72,7 @@ const makeImpl = Effect.gen(function*() {
         }),
         Stream.concat(Stream.suspend(() => {
           MutableRef.update(history, Prompt.concat(Prompt.fromResponseParts(responseParts)));
+          
           return Stream.make(new TurnComplete({ hadToolCall, text }));
         })),
       );
@@ -80,7 +81,6 @@ const makeImpl = Effect.gen(function*() {
     (stream) =>
       stream.pipe(
         Stream.provide(model),
-        Stream.tapError((cause) => Effect.logError("Agent executor error", { cause: JSON.stringify(cause, null, 2) })),
         Stream.catch((cause) =>
           Stream.fail(
             new AgentExecutorError({
