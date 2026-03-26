@@ -20,27 +20,9 @@ export const ToolkitFailureReason = Schema.Union([
   WriteFileFailed,
   CommandFailed,
 ]);
-
-const formatToolkitFailure = (
-  reason: ReadFileFailed | WriteFileFailed | CommandFailed,
-): string => {
-  switch (reason._tag) {
-    case "ReadFileFailed":
-      return `Failed to read file: ${reason.cause}`;
-    case "WriteFileFailed":
-      return `Failed to write file: ${reason.cause}`;
-    case "CommandFailed":
-      return `Failed to execute command: ${reason.cause}`;
-  }
-};
-
 export class ToolkitError extends Schema.TaggedErrorClass<ToolkitError>()("ToolkitError", {
   reason: ToolkitFailureReason,
-}) {
-  override get message(): string {
-    return formatToolkitFailure(this.reason);
-  }
-}
+}) {}
 
 export const ReadFileTool = Tool.make("readFile", {
   description: "Read and return the contents of a file",

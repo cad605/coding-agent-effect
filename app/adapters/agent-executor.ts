@@ -77,9 +77,7 @@ const makeImpl = Effect.gen(function*() {
     (stream) =>
       stream.pipe(
         Stream.provide(model),
-        Stream.tapError((cause) =>
-          Effect.logError("Agent executor error", { cause: JSON.stringify(cause, null, 2) }),
-        ),
+        Stream.tapError((cause) => Effect.logError("Agent executor error", { cause: JSON.stringify(cause, null, 2) })),
         Stream.catch((cause) =>
           Stream.fail(
             new AgentExecutorError({
