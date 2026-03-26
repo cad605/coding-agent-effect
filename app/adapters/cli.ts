@@ -27,7 +27,7 @@ const assistant = Command.make(
           ToolCallStart: () => Effect.void,
           ToolResult: () => Effect.void,
           UsageReport: () => Effect.void,
-          Completion: (event) => terminal.display(`\n${event.summary}\n`),
+          Completion: (event) => terminal.display(`${event.summary}\n`),
         })
       ),
     );
