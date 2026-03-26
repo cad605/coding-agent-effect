@@ -81,28 +81,10 @@ export const BashTool = Tool.make("bash", {
   failureMode: "return",
 });
 
-export class CompleteTaskResult extends Schema.Class("CompleteTaskResult")({
-  summary: Schema.String,
-  status: Schema.Literal("completed"),
-}) {}
-
-export const CompleteTaskTool = Tool.make("completeTask", {
-  description: "Signal that the requested task is complete",
-  parameters: Schema.Struct({
-    summary: Schema.String.annotate({
-      description: "A concise final summary of the completed task",
-    }),
-  }),
-  success: CompleteTaskResult,
-  failure: ToolkitError,
-  failureMode: "return",
-});
-
 export const AgentExecutorTools = Toolkit.make(
   ReadFileTool,
   WriteFileTool,
   BashTool,
-  CompleteTaskTool,
 );
 
 export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(function*() {
@@ -138,16 +120,9 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
     Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new CommandFailed({ cause }) }))),
   );
 
-  const completeTask = Effect.fn("toolkit.completeTask")(
-    function*({ summary }: { summary: string }) {
-      return new CompleteTaskResult({ summary, status: "completed" });
-    },
-  );
-
   return AgentExecutorTools.of({
     readFile,
     writeFile,
     bash,
-    completeTask,
   });
 }));

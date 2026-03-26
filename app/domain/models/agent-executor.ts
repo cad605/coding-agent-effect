@@ -25,7 +25,6 @@ export class UsageReport extends Schema.TaggedClass("UsageReport")("UsageReport"
 export class TurnComplete extends Schema.TaggedClass("TurnComplete")("TurnComplete", {
   hadToolCall: Schema.Boolean,
   text: Schema.String,
-  completionSummary: Schema.NullOr(Schema.String),
   promptDelta: Prompt.Prompt,
 }) {}
 

@@ -2,7 +2,7 @@ import { type Cause, Effect, Layer, MutableRef, Queue, Semaphore, Stream } from 
 import { Prompt } from "effect/unstable/ai";
 
 import { AgentError, ExecuteTurnFailed, ModelExecutionFailed, TurnBudgetExceeded } from "../../domain/errors/agent.ts";
-import type { TurnComplete } from "../../domain/models/agent-executor.ts";
+import { TurnComplete } from "../../domain/models/agent-executor.ts";
 import { CompletionOutput, type Output } from "../../domain/models/output.ts";
 
 import { AgentExecutor } from "../../ports/agent-executor.ts";
@@ -50,20 +50,24 @@ const makeImpl = Effect.gen(function*() {
             }),
             Effect.catchTag(
               "AgentExecutorError",
-              () =>
-                Effect.fail(
+              () => {
+                if (turns > 0) {
+                  turnComplete = new TurnComplete({
+                    hadToolCall: false,
+                    text: "",
+                    promptDelta: Prompt.empty,
+                  });
+                  return Effect.void;
+                }
+                return Effect.fail(
                   new AgentError({ reason: new ExecuteTurnFailed({ reason: new ModelExecutionFailed({}) }) }),
-                ),
+                );
+              },
             ),
           );
 
           const turn = turnComplete!;
           MutableRef.update(history, Prompt.concat(turn.promptDelta));
-
-          if (turn.completionSummary !== null) {
-            yield* Queue.offer(queue, new CompletionOutput({ summary: turn.completionSummary, status: "completed" }));
-            return;
-          }
 
           if (!turn.hadToolCall) {
             yield* Queue.offer(queue, new CompletionOutput({ summary: turn.text, status: "completed" }));

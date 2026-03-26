@@ -13,7 +13,7 @@ import {
 } from "../domain/models/agent-executor.ts";
 import { AgentExecutor } from "../ports/agent-executor.ts";
 import type { AgentExecutorShape } from "../ports/agent-executor.ts";
-import { AgentExecutorTools, AgentExecutorToolsService, CompleteTaskResult } from "./services/agent-executor-tools.ts";
+import { AgentExecutorTools, AgentExecutorToolsService } from "./services/agent-executor-tools.ts";
 import { ProviderService } from "./services/provider.ts";
 
 const makeImpl = Effect.gen(function*() {
@@ -27,7 +27,6 @@ const makeImpl = Effect.gen(function*() {
       const responseParts: Array<Response.AnyPart> = [];
       let text = "";
       let hadToolCall = false;
-      let completionSummary: string | null = null;
 
       const matchType = Match.discriminator("type");
 
@@ -44,19 +43,14 @@ const makeImpl = Effect.gen(function*() {
               hadToolCall = true;
               return [new ToolCallStart({ toolName: p.name, toolCallId: p.id })];
             }),
-            matchType("tool-result", (p) => {
-              if (p.result instanceof CompleteTaskResult) {
-                completionSummary = p.result.summary;
-              }
-              return [
-                new ToolResult({
-                  toolName: p.name,
-                  toolCallId: p.id,
-                  output: String(p.result),
-                  isFailure: p.isFailure,
-                }),
-              ];
-            }),
+            matchType("tool-result", (p) => [
+              new ToolResult({
+                toolName: p.name,
+                toolCallId: p.id,
+                output: String(p.result),
+                isFailure: p.isFailure,
+              }),
+            ]),
             matchType("finish", (p) => [
               new UsageReport({
                 inputTokens: p.usage.inputTokens.total ?? 0,
@@ -73,7 +67,6 @@ const makeImpl = Effect.gen(function*() {
             new TurnComplete({
               hadToolCall,
               text,
-              completionSummary,
               promptDelta: Prompt.fromResponseParts(responseParts),
             }),
           )

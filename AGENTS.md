@@ -19,3 +19,5 @@ effect.
 
 Use these for learning more about the library, rather than browsing the code in
 `node_modules/`.
+
+`.repos/challenge` to learn more about the challenge instructions.
