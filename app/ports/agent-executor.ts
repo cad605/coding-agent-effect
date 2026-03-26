@@ -1,19 +1,13 @@
-import { type Effect, ServiceMap } from "effect";
+import { ServiceMap, type Stream } from "effect";
+import type { Prompt } from "effect/unstable/ai";
 
 import type { AgentExecutorError } from "../domain/errors/agent-executor.ts";
-import type { AgentExecutorTurnResult } from "../domain/models/agent-executor.ts";
-import type { AgentRunInput } from "../domain/models/agent-run.ts";
-import type { Output } from "../domain/models/output.ts";
-
-export interface AgentExecutorSession {
-  executeTurn(): Effect.Effect<AgentExecutorTurnResult, AgentExecutorError, never>;
-}
+import type { TurnEvent } from "../domain/models/agent-executor.ts";
 
 export interface AgentExecutorShape {
-  createSession(
-    input: AgentRunInput,
-    emit: (output: Output) => Effect.Effect<void, never, never>,
-  ): Effect.Effect<AgentExecutorSession, AgentExecutorError, never>;
+  executeTurn(
+    prompt: Prompt.Prompt,
+  ): Stream.Stream<TurnEvent, AgentExecutorError>;
 }
 
 export class AgentExecutor extends ServiceMap.Service<AgentExecutor, AgentExecutorShape>()(

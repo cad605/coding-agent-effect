@@ -91,9 +91,3 @@ export class AgentRunInput extends Schema.Class("AgentRunInput")({
   declare readonly system: string | null;
   declare readonly session: AgentSession | null;
 }
-
-export class AgentRunState extends Schema.Class("AgentRunState")({
-  messages: Schema.Array(AgentRunMessage),
-}) {
-  declare readonly messages: ReadonlyArray<AgentRunMessage>;
-}

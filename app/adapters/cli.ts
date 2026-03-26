@@ -1,4 +1,4 @@
-import { Effect, Match, Stream, Terminal } from "effect";
+import { Effect, Match, pipe, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import { AgentRunInput } from "../domain/models/agent-run.ts";
 import type { Output } from "../domain/models/output.ts";
@@ -18,16 +18,19 @@ const assistant = Command.make(
 
     yield* Effect.logDebug("Prompting agent", { prompt });
 
-    const events = yield* agent.send(new AgentRunInput({ prompt, system: null, session: null }));
-
-    yield* Effect.logDebug("Streaming agent response");
-
-    yield* events.pipe(Stream.runForEach((event: Output) =>
-      Match.valueTags(event, {
-        AssistantText: (event) => terminal.display(event.text),
-        Completion: (event) => terminal.display(`Task complete: ${event.summary}`),
-      })
-    ));
+    yield* pipe(
+      agent.send(new AgentRunInput({ prompt, system: null, session: null })),
+      Stream.unwrap,
+      Stream.runForEach((event: Output) =>
+        Match.valueTags(event, {
+          TextDelta: (event) => terminal.display(event.delta),
+          ToolCallStart: (event) => terminal.display(`\n[tool: ${event.toolName}]\n`),
+          ToolResult: (event) => terminal.display(`[result: ${event.output}]\n`),
+          UsageReport: () => Effect.void,
+          Completion: (event) => terminal.display(`\nTask complete: ${event.summary}\n`),
+        })
+      ),
+    );
 
     yield* Effect.logDebug("Assistant completed");
   }),

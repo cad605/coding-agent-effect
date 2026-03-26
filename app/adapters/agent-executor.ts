@@ -1,108 +1,105 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Effect, Layer, Match, Stream } from "effect";
-import { Chat } from "effect/unstable/ai";
+import { Effect, Layer, Stream } from "effect";
+import { LanguageModel, Prompt, type Response } from "effect/unstable/ai";
 
-import { AgentExecutorError, ModelTurnFailed, ToolRuntimeFailed } from "../domain/errors/agent-executor.ts";
-import { AgentExecutorTurnResult } from "../domain/models/agent-executor.ts";
-import { AssistantTextOutput, CompletionOutput } from "../domain/models/output.ts";
-import { buildSessionMessages } from "../domain/utils/agent-run-state.ts";
+import { AgentExecutorError, ModelTurnFailed } from "../domain/errors/agent-executor.ts";
+import {
+  TextDelta,
+  ToolCallStart,
+  ToolResult,
+  TurnComplete,
+  type TurnEvent,
+  UsageReport,
+} from "../domain/models/agent-executor.ts";
 import { AgentExecutor } from "../ports/agent-executor.ts";
-import type { AgentExecutorSession, AgentExecutorShape } from "../ports/agent-executor.ts";
-import { AgentExecutorTools, AgentExecutorToolsService } from "./services/agent-executor-tools.ts";
-import type { ToolkitError } from "./services/agent-executor-tools.ts";
+import type { AgentExecutorShape } from "../ports/agent-executor.ts";
+import { AgentExecutorTools, AgentExecutorToolsService, CompleteTaskResult } from "./services/agent-executor-tools.ts";
 import { ProviderService } from "./services/provider.ts";
-
-interface TurnState {
-  readonly text: string;
-  readonly hadToolCall: boolean;
-  readonly completionSummary: string | null;
-}
-
-const initialTurnState = (): TurnState => ({
-  text: "",
-  hadToolCall: false,
-  completionSummary: null,
-});
-
-const toToolName = (error: ToolkitError): string => {
-  switch (error.reason._tag) {
-    case "ReadFileFailed":
-      return "readFile";
-    case "WriteFileFailed":
-      return "writeFile";
-    case "CommandFailed":
-      return "bash";
-  }
-};
 
 const makeImpl = Effect.gen(function*() {
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
 
-  const createSession: AgentExecutorShape["createSession"] = Effect.fn("agent-executor.createSession")(
-    function*(input, emit) {
-      const chat = yield* Chat.fromPrompt(buildSessionMessages(input));
+  const executeTurn: AgentExecutorShape["executeTurn"] = Effect.fn("agent-executor.executeTurn")(
+    function*(prompt) {
+      yield* Effect.logDebug("Executing agent turn");
 
-      const executeTurn: AgentExecutorSession["executeTurn"] = Effect.fn("agent-executor.executeTurn")(
-        function*() {
-          yield* Effect.logDebug("Executing agent turn");
+      const responseParts: Array<Response.AnyPart> = [];
+      let text = "";
+      let hadToolCall = false;
+      let completionSummary: string | null = null;
 
-          const turn = yield* chat.streamText({ prompt: [], toolkit }).pipe(
-            Stream.runFoldEffect(initialTurnState, (state, part) =>
-              Match.value(part).pipe(
-                Match.when({ type: "text-delta" }, (p) =>
-                  Effect.succeed({ ...state, text: state.text + p.delta }),
-                ),
-                Match.when({ type: "tool-call" }, () =>
-                  Effect.succeed({ ...state, hadToolCall: true }),
-                ),
-                Match.when(
-                  { type: "tool-result", name: "completeTask", isFailure: false, preliminary: false },
-                  (p) => {
-                    const summary = (p.result as { summary: string }).summary;
-                    return emit(new CompletionOutput({ summary, status: "completed" })).pipe(
-                      Effect.map(() => ({ ...state, completionSummary: summary })),
-                    );
-                  },
-                ),
-                Match.orElse(() => Effect.succeed(state)),
-              ),
-            ),
-          );
+      return LanguageModel.streamText({ prompt, toolkit }).pipe(
+        Stream.flatMap((part) => {
+          responseParts.push(part);
+          const events: Array<TurnEvent> = [];
 
-          if (turn.text.trim().length > 0) {
-            yield* emit(new AssistantTextOutput({ text: turn.text }));
+          switch (part.type) {
+            case "text-delta":
+            case "reasoning-delta":
+              text += part.delta;
+              events.push(new TextDelta({ delta: part.delta }));
+              break;
+            case "tool-call":
+              hadToolCall = true;
+              events.push(new ToolCallStart({ toolName: part.name, toolCallId: part.id }));
+              break;
+            case "tool-result":
+              if (!part.preliminary) {
+                if (part.result instanceof CompleteTaskResult) {
+                  completionSummary = part.result.summary;
+                }
+                events.push(
+                  new ToolResult({
+                    toolName: part.name,
+                    toolCallId: part.id,
+                    output: String(part.result),
+                    isFailure: part.isFailure,
+                  }),
+                );
+              }
+              break;
+            case "finish": {
+              const usage = part.usage;
+              events.push(
+                new UsageReport({
+                  inputTokens: usage.inputTokens.total ?? 0,
+                  outputTokens: usage.outputTokens.total ?? 0,
+                }),
+              );
+              break;
+            }
           }
 
-          return new AgentExecutorTurnResult({
-            hadToolCall: turn.hadToolCall,
-            completed: turn.completionSummary !== null,
-          });
-        },
-        Effect.provide(model),
-        Effect.catchTag("ToolkitError", (error: ToolkitError) =>
-          Effect.fail(
-            new AgentExecutorError({
-              reason: new ToolRuntimeFailed({
-                toolName: toToolName(error),
-                message: error.message,
-              }),
+          return Stream.fromIterable(events);
+        }),
+        Stream.concat(Stream.suspend(() =>
+          Stream.make(
+            new TurnComplete({
+              hadToolCall,
+              text,
+              completionSummary,
+              promptDelta: Prompt.fromResponseParts(responseParts),
             }),
-          )),
-        Effect.catch((cause) =>
-          Effect.fail(
+          )
+        )),
+      );
+    },
+    Stream.unwrap,
+    (stream) =>
+      stream.pipe(
+        Stream.provide(model),
+        Stream.catch((cause) =>
+          Stream.fail(
             new AgentExecutorError({
               reason: new ModelTurnFailed({ cause }),
             }),
           )
         ),
-      );
-
-      return { executeTurn } satisfies AgentExecutorSession;
-    },
+      ),
   );
 
-  return AgentExecutor.of({ createSession }) satisfies AgentExecutorShape;
+  return AgentExecutor.of({ executeTurn }) satisfies AgentExecutorShape;
 }).pipe(Effect.provide(AgentExecutorToolsService), Effect.provide(ProviderService));
 
 export const AgentExecutorAdapter = Layer.effect(AgentExecutor, makeImpl);
