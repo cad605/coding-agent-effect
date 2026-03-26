@@ -46,7 +46,7 @@ export const WriteFileTool = Tool.make("writeFile", {
       description: "The contents to write to the file",
     }),
   }),
-  success: Schema.Void,
+  success: Schema.String,
   failure: ToolkitError,
   failureMode: "return",
 });
@@ -87,6 +87,8 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
       yield* Effect.logDebug("Writing file", { filePath, content });
 
       yield* fs.writeFileString(filePath, content);
+
+      return "File written successfully.";
     },
     Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new WriteFileFailed({ cause }) }))),
   );
