@@ -51,7 +51,7 @@ export const ReadFileTool = Tool.make("readFile", {
   }),
   success: Schema.String,
   failure: ToolkitError,
-  failureMode: "error",
+  failureMode: "return",
 });
 
 export const WriteFileTool = Tool.make("writeFile", {
@@ -66,7 +66,7 @@ export const WriteFileTool = Tool.make("writeFile", {
   }),
   success: Schema.Void,
   failure: ToolkitError,
-  failureMode: "error",
+  failureMode: "return",
 });
 
 export const BashTool = Tool.make("bash", {
@@ -78,7 +78,7 @@ export const BashTool = Tool.make("bash", {
   }),
   success: Schema.String,
   failure: ToolkitError,
-  failureMode: "error",
+  failureMode: "return",
 });
 
 export class CompleteTaskResult extends Schema.Class("CompleteTaskResult")({
@@ -95,7 +95,7 @@ export const CompleteTaskTool = Tool.make("completeTask", {
   }),
   success: CompleteTaskResult,
   failure: ToolkitError,
-  failureMode: "error",
+  failureMode: "return",
 });
 
 export const AgentExecutorTools = Toolkit.make(
@@ -123,8 +123,6 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
       yield* Effect.logDebug("Writing file", { filePath, content });
 
       yield* fs.writeFileString(filePath, content);
-
-      return Effect.void;
     },
     Effect.catch((cause) => Effect.fail(new ToolkitError({ reason: new WriteFileFailed({ cause }) }))),
   );
