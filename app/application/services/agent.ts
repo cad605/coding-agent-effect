@@ -1,8 +1,15 @@
-import { type Cause, Effect, Layer, Queue, Semaphore, Stream } from "effect";
+import { type Cause, Effect, Layer, Match, Queue, Semaphore, Stream } from "effect";
 
 import { AgentError, ExecuteTurnFailed, ModelExecutionFailed, TurnBudgetExceeded } from "../../domain/errors/agent.ts";
 import { TurnComplete, TurnInput } from "../../domain/models/agent-executor.ts";
-import { CompletionOutput, type Output } from "../../domain/models/output.ts";
+import {
+  AgentTextDelta,
+  AgentToolCallStart,
+  AgentToolResult,
+  AgentUsageReport,
+  CompletionOutput,
+  type Output,
+} from "../../domain/models/output.ts";
 
 import { AgentExecutor } from "../../ports/agent-executor.ts";
 import { Agent, type AgentShape } from "../../ports/agent.ts";
@@ -44,7 +51,22 @@ const makeImpl = Effect.gen(function*() {
                 turnComplete = event;
                 return Effect.void;
               }
-              Queue.offerUnsafe(queue, event);
+              
+              const output: Output = Match.valueTags(event, {
+                TextDelta: (e) => new AgentTextDelta({ delta: e.delta }),
+                ToolCallStart: (e) => new AgentToolCallStart({ toolName: e.toolName, toolCallId: e.toolCallId }),
+                ToolResult: (e) =>
+                  new AgentToolResult({
+                    toolName: e.toolName,
+                    toolCallId: e.toolCallId,
+                    output: e.output,
+                    isFailure: e.isFailure,
+                  }),
+                UsageReport: (e) => new AgentUsageReport({ inputTokens: e.inputTokens, outputTokens: e.outputTokens }),
+              });
+              
+              Queue.offer(queue, output);
+              
               return Effect.void;
             }),
             Effect.catchTag(

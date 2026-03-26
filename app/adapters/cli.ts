@@ -23,10 +23,10 @@ const assistant = Command.make(
       Stream.unwrap,
       Stream.runForEach((event: Output) =>
         Match.valueTags(event, {
-          TextDelta: () => Effect.void,
-          ToolCallStart: () => Effect.void,
-          ToolResult: () => Effect.void,
-          UsageReport: () => Effect.void,
+          AgentTextDelta: () => Effect.void,
+          AgentToolCallStart: () => Effect.void,
+          AgentToolResult: () => Effect.void,
+          AgentUsageReport: () => Effect.void,
           Completion: (event) => terminal.display(`${event.summary}\n`),
         })
       ),
