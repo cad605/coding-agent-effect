@@ -1,5 +1,5 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Effect, Layer, Match, Ref, Result, Stream } from "effect";
+import { Array, Effect, Layer, Match, Option, Ref, Result, Stream } from "effect";
 import { Chat } from "effect/unstable/ai";
 
 import { ExecutorError } from "../domain/errors/executor.ts";
@@ -19,8 +19,6 @@ const makeImpl = Effect.gen(function*() {
         content: "You are a helpful assistant specialized in coding.",
       }]);
 
-      const finishReason = yield* Ref.make<string>("stop");
-
       const stream = chat.streamText({ prompt, toolkit }).pipe(Stream.provide(model));
 
       return stream.pipe(
@@ -33,27 +31,32 @@ const makeImpl = Effect.gen(function*() {
               Result.succeed(
                 new ToolResult({ name, id, output: String(result), isFailure }),
               )),
-            Match.when({ type: "finish" }, ({ usage: { inputTokens, outputTokens }, reason }) => {
-              Ref.set(finishReason, reason)
-
-              return Result.succeed(
+            Match.when({ type: "finish" }, ({ usage: { inputTokens, outputTokens } }) =>
+              Result.succeed(
                 new Usage({
                   inputTokens: inputTokens.total ?? 0,
                   outputTokens: outputTokens.total ?? 0,
                 }),
-              )
-            }),
+              )),
             Match.orElse(() => Result.failVoid),
           )
         ),
-        Stream.tap((event) => Effect.logDebug("Executor event", { event })),
         Stream.concat(
           Stream.unwrap(
             Effect.gen(function*() {
-              const reason = yield* Ref.get(finishReason);
+              const history = yield* Ref.get(chat.history);
 
-              if (reason === "tool-calls") {
-                return yield* runLoop({ prompt: "" });
+              const lastAssistantPart = Array.findLast(history.content, (part) => part.role === "assistant");
+
+              if (Option.isSome(lastAssistantPart)) {
+                const hasToolCall = Array.findLast(
+                  lastAssistantPart.value.content,
+                  (part) => part.type === "tool-call",
+                );
+
+                if (Option.isSome(hasToolCall)) {
+                  return yield* runLoop({ prompt: "" });
+                }
               }
 
               return Stream.empty;
