@@ -24,11 +24,8 @@ const assistant = Command.make(
           TextDelta: ({ delta }) => terminal.display(delta),
           ReasoningDelta: ({ delta }) => terminal.display(delta),
           ToolCall: ({ name }) => terminal.display(`\n[tool: ${name}]\n`),
-          ToolResult: ({ name, isFailure }) =>
-            terminal.display(`[${isFailure ? "failed" : "done"}: ${name}]\n`),
-          Usage: ({ inputTokens, outputTokens }) =>
-            terminal.display(`\n(${inputTokens} in / ${outputTokens} out)\n`),
-          Ignored: () => Effect.void,
+          ToolResult: ({ name, isFailure }) => terminal.display(`[${isFailure ? "failed" : "done"}: ${name}]\n`),
+          Usage: ({ inputTokens, outputTokens }) => terminal.display(`\n(${inputTokens} in / ${outputTokens} out)\n`),
         })
       ),
     );

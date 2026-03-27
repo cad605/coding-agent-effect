@@ -1,4 +1,4 @@
-import { Effect, Layer, Predicate, Semaphore, Stream } from "effect";
+import { Effect, Layer, Semaphore, Stream } from "effect";
 
 import { AgentError } from "../../domain/errors/agent.ts";
 import { Agent, type AgentShape } from "../../ports/agent.ts";
@@ -23,7 +23,6 @@ const makeImpl = Effect.gen(function*() {
       const stream = yield* executor.stream({ prompt });
 
       return stream.pipe(
-        Stream.takeUntil(Predicate.isTagged("Usage")),
         Stream.catch((cause) => Stream.fail(new AgentError({ cause }))),
       );
     },

@@ -25,9 +25,7 @@ export class Usage extends Schema.TaggedClass("Usage")("Usage", {
   outputTokens: Schema.Number,
 }) {}
 
-export class Ignored extends Schema.TaggedClass("Ignored")("Ignored", {}) {}
-
-export type TurnEvent = TextDelta | ReasoningDelta | ToolCall | ToolResult | Usage | Ignored;
+export type TurnEvent = TextDelta | ReasoningDelta | ToolCall | ToolResult | Usage;
 
 export const TurnEvent = Schema.Union([
   TextDelta,
@@ -35,5 +33,4 @@ export const TurnEvent = Schema.Union([
   ToolCall,
   ToolResult,
   Usage,
-  Ignored,
 ]);
