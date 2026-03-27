@@ -1,7 +1,23 @@
-import { Effect, Match, pipe, Ref, Stream, Terminal } from "effect";
+import { Effect, Match, Option, pipe, Ref, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import  { Prompt } from "../domain/models/primitives.ts";
+
+import { Prompt, SessionId } from "../domain/models/primitives.ts";
+import { ContinueSession, NewSession, ResumeSession } from "../domain/models/session.ts";
 import { Agent, AgentSendInput } from "../ports/agent.ts";
+
+const resolveSessionIntent = Effect.fn("cli.resolveSessionIntent")(function*(
+  { latest, sessionId }: { latest: boolean; sessionId: Option.Option<string> },
+) {
+  if (Option.isSome(sessionId)) {
+    return ResumeSession.makeUnsafe({ sessionId: SessionId.makeUnsafe(sessionId.value) });
+  }
+
+  if (latest) {
+    return ContinueSession.makeUnsafe({});
+  }
+
+  return NewSession.makeUnsafe({});
+});
 
 const assistant = Command.make(
   "assistant",
@@ -10,17 +26,34 @@ const assistant = Command.make(
       Flag.withAlias("p"),
       Flag.withDescription("The prompt to operate on."),
     ),
+    latest: Flag.boolean("continue").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("Continue the most recent session."),
+      Flag.withDefault(false),
+    ),
+    sessionId: Flag.string("resume").pipe(
+      Flag.withAlias("r"),
+      Flag.withDescription("Resume a specific session by ID."),
+      Flag.optional,
+    ),
   },
-  Effect.fn("cli.assistant")(function*({ prompt }: { prompt: string }) {
+  Effect.fn("cli.assistant")(function*({ latest, sessionId, prompt }) {
     const agent = yield* Agent;
     const terminal = yield* Terminal.Terminal;
 
-    yield* Effect.logDebug("Prompting agent", { prompt });
+    const sessionIntent = yield* resolveSessionIntent({ latest, sessionId });
+
+    yield* Effect.logDebug("Prompting agent", { prompt, sessionIntent });
 
     const accumulated = yield* Ref.make("");
 
     yield* pipe(
-      agent.send(new AgentSendInput({ prompt: Prompt.makeUnsafe(prompt) })),
+      agent.send(
+        new AgentSendInput({
+          prompt: Prompt.makeUnsafe(prompt),
+          sessionIntent,
+        }),
+      ),
       Stream.unwrap,
       Stream.runForEach((event) =>
         Match.valueTags(event, {
@@ -32,8 +65,9 @@ const assistant = Command.make(
         })
       ),
     );
-    
+
     const result = yield* Ref.get(accumulated);
+
     yield* terminal.display(result);
 
     yield* Effect.logDebug("Assistant completed");

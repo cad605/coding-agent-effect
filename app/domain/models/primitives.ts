@@ -26,3 +26,6 @@ export type FileContents = typeof FileContents.Type;
 
 export const ShellCommand = Schema.String.pipe(Schema.brand("ShellCommand"));
 export type ShellCommand = typeof ShellCommand.Type;
+
+export const SessionId = Schema.String.pipe(Schema.brand("SessionId"));
+export type SessionId = typeof SessionId.Type;
