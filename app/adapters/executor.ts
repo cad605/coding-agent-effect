@@ -1,5 +1,5 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
-import { Array, Effect, Layer, Match, Option, Ref, Result, Stream } from "effect";
+import { Effect, Layer, Match, Ref, Result, Stream } from "effect";
 import { Chat } from "effect/unstable/ai";
 
 import { ExecutorError } from "../domain/errors/executor.ts";
@@ -12,32 +12,39 @@ const makeImpl = Effect.gen(function*() {
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
 
-  const chat = yield* Chat.fromPrompt([{
-    role: "system",
-    content: "You are a helpful assistant specialized in coding.",
-  }]);
-
   const runLoop = Effect.fn("executor.handleTurn")(
     function*({ prompt }: { prompt: string }): Effect.fn.Return<Stream.Stream<TurnEvent, ExecutorError>> {
+      const chat = yield* Chat.fromPrompt([{
+        role: "system",
+        content: "You are a helpful assistant specialized in coding.",
+      }]);
+
+      const finishReason = yield* Ref.make<string>("stop");
+
       const stream = chat.streamText({ prompt, toolkit }).pipe(Stream.provide(model));
 
       return stream.pipe(
         Stream.filterMap((part) =>
           Match.value(part).pipe(
-            Match.when({ type: "text-delta" }, (p) => Result.succeed(new TextDelta({ delta: p.delta }))),
-            Match.when({ type: "reasoning-delta" }, (p) => Result.succeed(new ReasoningDelta({ delta: p.delta }))),
-            Match.when({ type: "tool-call" }, (p) => Result.succeed(new ToolCall({ name: p.name, id: p.id }))),
-            Match.when({ type: "tool-result" }, (p) =>
+            Match.when({ type: "text-delta" }, ({ delta }) => Result.succeed(new TextDelta({ delta }))),
+            Match.when({ type: "reasoning-delta" }, ({ delta }) => Result.succeed(new ReasoningDelta({ delta }))),
+            Match.when({ type: "tool-call" }, ({ name, id }) => Result.succeed(new ToolCall({ name, id }))),
+            Match.when({ type: "tool-result" }, ({ name, id, result, isFailure }) =>
               Result.succeed(
-                new ToolResult({ name: p.name, id: p.id, output: String(p.result), isFailure: p.isFailure }),
+                new ToolResult({ name, id, output: String(result), isFailure }),
               )),
-            Match.when({ type: "finish" }, (p) =>
-              Result.succeed(
+            Match.when({ type: "finish" }, ({ usage: { inputTokens, outputTokens }, reason }) => {
+              if (reason === "tool-calls") {
+                Ref.set(finishReason, reason)
+              }
+
+              return Result.succeed(
                 new Usage({
-                  inputTokens: p.usage.inputTokens.total ?? 0,
-                  outputTokens: p.usage.outputTokens.total ?? 0,
+                  inputTokens: inputTokens.total ?? 0,
+                  outputTokens: outputTokens.total ?? 0,
                 }),
-              )),
+              )
+            }),
             Match.orElse(() => Result.failVoid),
           )
         ),
@@ -45,21 +52,12 @@ const makeImpl = Effect.gen(function*() {
         Stream.concat(
           Stream.unwrap(
             Effect.gen(function*() {
-              const history = yield* Ref.get(chat.history);
+              const reason = yield* Ref.get(finishReason);
 
-              const lastAssistantPart = Array.findLast(history.content, (part) => part.role === "assistant");
-
-              if (Option.isSome(lastAssistantPart)) {
-                const hasToolCall = Array.findLast(
-                  lastAssistantPart.value.content,
-                  (part) => part.type === "tool-call",
-                );
-
-                if (Option.isSome(hasToolCall)) {
-                  return yield* runLoop({ prompt: "" });
-                }
+              if (reason === "tool-calls") {
+                return yield* runLoop({ prompt: "" });
               }
-
+              
               return Stream.empty;
             }),
           ),
