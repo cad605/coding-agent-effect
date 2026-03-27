@@ -3,7 +3,7 @@ import { Effect, Layer, Match, Stream } from "effect";
 import { Chat } from "effect/unstable/ai";
 
 import { ExecutorError } from "../domain/errors/executor.ts";
-import { Ignored, ReasoningDelta, ReasoningEnd, TextDelta, TextEnd } from "../domain/models/turn-event.ts";
+import { Ignored, ReasoningDelta, TextDelta, ToolCall, ToolResult, Usage } from "../domain/models/turn-event.ts";
 import { Executor, type ExecutorShape } from "../ports/executor.ts";
 import { AgentExecutorTools, AgentExecutorToolsService } from "./services/agent-executor-tools.ts";
 import { ProviderService } from "./services/provider.ts";
@@ -21,9 +21,14 @@ const makeImpl = Effect.gen(function*() {
         Stream.map((part) =>
           Match.value(part).pipe(
             Match.when({ type: "text-delta" }, ({ delta }) => new TextDelta({ delta })),
-            Match.when({ type: "text-end" }, () => new TextEnd()),
             Match.when({ type: "reasoning-delta" }, ({ delta }) => new ReasoningDelta({ delta })),
-            Match.when({ type: "reasoning-end" }, () => new ReasoningEnd()),
+            Match.when({ type: "tool-call" }, ({ name, id }) => new ToolCall({ name, id })),
+            Match.when({ type: "tool-result" }, ({ name, id, result, isFailure }) =>
+              new ToolResult({ name, id, output: String(result), isFailure }),
+            ),
+            Match.when({ type: "finish" }, ({ usage: { inputTokens: { total: inputTokens }, outputTokens: { total: outputTokens } } }) =>
+              new Usage({ inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0 }),
+            ),
             Match.orElse(() => new Ignored()),
           )
         ),

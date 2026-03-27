@@ -21,7 +21,14 @@ const assistant = Command.make(
       Stream.unwrap,
       Stream.runForEach((event) =>
         Match.valueTags(event, {
-          AgentComplete: ({ text }) => terminal.display(`${text}\n`),
+          TextDelta: ({ delta }) => terminal.display(delta),
+          ReasoningDelta: ({ delta }) => terminal.display(delta),
+          ToolCall: ({ toolName }) => terminal.display(`\n[tool: ${toolName}]\n`),
+          ToolResult: ({ toolName, isFailure }) =>
+            terminal.display(`[${isFailure ? "failed" : "done"}: ${toolName}]\n`),
+          Usage: ({ inputTokens, outputTokens }) =>
+            terminal.display(`\n(${inputTokens} in / ${outputTokens} out)\n`),
+          Ignored: () => Effect.void,
         })
       ),
     );

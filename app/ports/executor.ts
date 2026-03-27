@@ -1,4 +1,4 @@
-import { Effect, Schema, ServiceMap, type Stream } from "effect";
+import { type Effect, Schema, ServiceMap, type Stream } from "effect";
 
 import type { ExecutorError } from "../domain/errors/executor.ts";
 import type { TurnEvent } from "../domain/models/turn-event.ts";

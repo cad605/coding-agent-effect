@@ -1,8 +1,6 @@
-import { Effect, Layer, Match, Semaphore, Stream } from "effect";
+import { Effect, Layer, Predicate, Semaphore, Stream } from "effect";
 
 import { AgentError } from "../../domain/errors/agent.ts";
-
-import { AgentComplete } from "../../domain/models/agent-response.ts";
 import { Agent, type AgentShape } from "../../ports/agent.ts";
 import { Executor } from "../../ports/executor.ts";
 
@@ -25,15 +23,7 @@ const makeImpl = Effect.gen(function*() {
       const stream = yield* executor.stream({ prompt });
 
       return stream.pipe(
-        Stream.map((event) => {
-          return Match.valueTags(event, {
-            TextDelta: ({ delta }) => new AgentComplete({ text: delta }),
-            TextEnd: () => new AgentComplete({ text: "" }),
-            ReasoningDelta: ({ delta }) => new AgentComplete({ text: delta }),
-            ReasoningEnd: () => new AgentComplete({ text: "" }),
-            Ignored: () => new AgentComplete({ text: "" }),
-          });
-        }),
+        Stream.takeUntil(Predicate.isTagged("Usage")),
         Stream.catch((cause) => Stream.fail(new AgentError({ cause }))),
       );
     },
