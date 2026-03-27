@@ -22,10 +22,10 @@ const assistant = Command.make(
       Stream.runForEach((event) =>
         Match.valueTags(event, {
           TextDelta: ({ delta }) => terminal.display(delta),
-          ReasoningDelta: ({ delta }) => terminal.display(delta),
-          ToolCall: ({ name }) => terminal.display(`\n[tool: ${name}]\n`),
-          ToolResult: ({ name, isFailure }) => terminal.display(`[${isFailure ? "failed" : "done"}: ${name}]\n`),
-          Usage: ({ inputTokens, outputTokens }) => terminal.display(`\n(${inputTokens} in / ${outputTokens} out)\n`),
+          ReasoningDelta: ({ delta }) => Effect.void,
+          ToolCall: ({ name }) => Effect.void,
+          ToolResult: ({ name, isFailure }) => Effect.void,
+          Usage: ({ inputTokens, outputTokens }) => Effect.void,
         })
       ),
     );
