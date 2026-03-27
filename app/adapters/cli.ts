@@ -24,10 +24,10 @@ const assistant = Command.make(
       Stream.runForEach((event) =>
         Match.valueTags(event, {
           TextDelta: ({ delta }) => Ref.update(accumulated, (prev) => prev + delta),
-          ReasoningDelta: ({ delta }) => Effect.void,
+          ReasoningDelta: ({ delta }) => Effect.logDebug("Reasoning delta", { delta }),
           ToolCall: ({ name }) => Ref.set(accumulated, ""),
-          ToolResult: ({ name, isFailure }) => Effect.void,
-          Usage: ({ inputTokens, outputTokens }) => Effect.void,
+          ToolResult: ({ name, isFailure }) => Effect.logDebug("Tool result", { name, isFailure }),
+          Usage: ({ inputTokens, outputTokens }) => Effect.logDebug("Usage", { inputTokens, outputTokens }),
         })
       ),
     );
