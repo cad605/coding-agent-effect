@@ -1,4 +1,4 @@
-import { Effect, Match, pipe, Stream, Terminal } from "effect";
+import { Effect, Match, pipe, Ref, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import { Agent, AgentSendInput } from "../ports/agent.ts";
 
@@ -16,19 +16,24 @@ const assistant = Command.make(
 
     yield* Effect.logDebug("Prompting agent", { prompt });
 
+    const accumulated = yield* Ref.make("");
+
     yield* pipe(
       agent.send(new AgentSendInput({ prompt })),
       Stream.unwrap,
       Stream.runForEach((event) =>
         Match.valueTags(event, {
-          TextDelta: ({ delta }) => terminal.display(delta),
+          TextDelta: ({ delta }) => Ref.update(accumulated, (prev) => prev + delta),
           ReasoningDelta: ({ delta }) => Effect.void,
-          ToolCall: ({ name }) => Effect.void,
+          ToolCall: ({ name }) => Ref.set(accumulated, ""),
           ToolResult: ({ name, isFailure }) => Effect.void,
           Usage: ({ inputTokens, outputTokens }) => Effect.void,
         })
       ),
     );
+    
+    const result = yield* Ref.get(accumulated);
+    yield* terminal.display(result);
 
     yield* Effect.logDebug("Assistant completed");
   }),
