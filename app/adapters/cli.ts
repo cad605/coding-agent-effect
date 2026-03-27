@@ -1,8 +1,6 @@
 import { Effect, Match, pipe, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import { AgentRunInput } from "../domain/models/agent-run.ts";
-import type { Output } from "../domain/models/output.ts";
-import { Agent } from "../ports/agent.ts";
+import { Agent, AgentSendInput } from "../ports/agent.ts";
 
 const assistant = Command.make(
   "assistant",
@@ -19,15 +17,11 @@ const assistant = Command.make(
     yield* Effect.logDebug("Prompting agent", { prompt });
 
     yield* pipe(
-      agent.send(new AgentRunInput({ prompt, system: null })),
+      agent.send(new AgentSendInput({ prompt })),
       Stream.unwrap,
-      Stream.runForEach((event: Output) =>
+      Stream.runForEach((event) =>
         Match.valueTags(event, {
-          AgentTextDelta: () => Effect.void,
-          AgentToolCallStart: () => Effect.void,
-          AgentToolResult: () => Effect.void,
-          AgentUsageReport: () => Effect.void,
-          Completion: ({ summary }) => terminal.display(`${summary}\n`),
+          AgentComplete: ({ text }) => terminal.display(`${text}\n`),
         })
       ),
     );

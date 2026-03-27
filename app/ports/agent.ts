@@ -1,11 +1,14 @@
-import { type Effect, type Scope, ServiceMap, type Stream } from "effect";
+import { type Effect, Schema, ServiceMap, type Stream } from "effect";
 
 import type { AgentError } from "../domain/errors/agent.ts";
-import type { AgentRunInput } from "../domain/models/agent-run.ts";
-import type { Output } from "../domain/models/output.ts";
+import type { AgentResponse } from "../domain/models/agent-response.ts";
+
+export class AgentSendInput extends Schema.Class("AgentSendInput")({
+  prompt: Schema.String,
+}) {}
 
 export interface AgentShape {
-  send(input: AgentRunInput): Effect.Effect<Stream.Stream<Output, AgentError>, never, Scope.Scope>;
+  send(input: AgentSendInput): Effect.Effect<Stream.Stream<AgentResponse, AgentError>, never>;
 }
 
 export class Agent extends ServiceMap.Service<Agent, AgentShape>()(
