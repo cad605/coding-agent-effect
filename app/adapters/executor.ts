@@ -12,13 +12,15 @@ const makeImpl = Effect.gen(function*() {
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("anthropic/claude-haiku-4.5");
 
+
+
   const runLoop = Effect.fn("executor.handleTurn")(
     function*({ prompt }: { prompt: string }): Effect.fn.Return<Stream.Stream<TurnEvent, ExecutorError>> {
       const chat = yield* Chat.fromPrompt([{
         role: "system",
         content: "You are a helpful assistant specialized in coding.",
       }]);
-
+      
       const stream = chat.streamText({ prompt, toolkit }).pipe(Stream.provide(model));
 
       return stream.pipe(
@@ -41,6 +43,7 @@ const makeImpl = Effect.gen(function*() {
             Match.orElse(() => Result.failVoid),
           )
         ),
+        Stream.tap((event) => Effect.logDebug("Executor event", { event })),
         Stream.concat(
           Stream.unwrap(
             Effect.gen(function*() {
