@@ -17,7 +17,7 @@ const makeImpl = Effect.gen(function*() {
     content: "You are a helpful assistant specialized in coding.",
   }]);
 
-  const handleTurn = Effect.fn("executor.handleTurn")(
+  const runLoop = Effect.fn("executor.handleTurn")(
     function*({ prompt }: { prompt: string }): Effect.fn.Return<Stream.Stream<TurnEvent, ExecutorError>> {
       const stream = chat.streamText({ prompt, toolkit }).pipe(Stream.provide(model));
 
@@ -41,6 +41,7 @@ const makeImpl = Effect.gen(function*() {
             Match.orElse(() => Result.failVoid),
           )
         ),
+        Stream.tap((event) => Effect.logDebug("Executor event", { event })),
         Stream.concat(
           Stream.unwrap(
             Effect.gen(function*() {
@@ -49,12 +50,13 @@ const makeImpl = Effect.gen(function*() {
               const lastAssistantPart = Array.findLast(history.content, (part) => part.role === "assistant");
 
               if (Option.isSome(lastAssistantPart)) {
-                const hasToolCall = Option.fromNullOr(
-                  Array.findLast(lastAssistantPart.value.content, (part) => part.type === "tool-call"),
+                const hasToolCall = Array.findLast(
+                  lastAssistantPart.value.content,
+                  (part) => part.type === "tool-call",
                 );
 
                 if (Option.isSome(hasToolCall)) {
-                  return yield* handleTurn({ prompt: "" });
+                  return yield* runLoop({ prompt: "" });
                 }
               }
 
@@ -69,7 +71,7 @@ const makeImpl = Effect.gen(function*() {
 
   const stream: ExecutorShape["stream"] = Effect.fn("executor.stream")(
     function*({ prompt }) {
-      return yield* handleTurn({ prompt });
+      return yield* runLoop({ prompt });
     },
   );
 
