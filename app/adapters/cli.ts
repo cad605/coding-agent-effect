@@ -23,9 +23,9 @@ const assistant = Command.make(
         Match.valueTags(event, {
           TextDelta: ({ delta }) => terminal.display(delta),
           ReasoningDelta: ({ delta }) => terminal.display(delta),
-          ToolCall: ({ toolName }) => terminal.display(`\n[tool: ${toolName}]\n`),
-          ToolResult: ({ toolName, isFailure }) =>
-            terminal.display(`[${isFailure ? "failed" : "done"}: ${toolName}]\n`),
+          ToolCall: ({ name }) => terminal.display(`\n[tool: ${name}]\n`),
+          ToolResult: ({ name, isFailure }) =>
+            terminal.display(`[${isFailure ? "failed" : "done"}: ${name}]\n`),
           Usage: ({ inputTokens, outputTokens }) =>
             terminal.display(`\n(${inputTokens} in / ${outputTokens} out)\n`),
           Ignored: () => Effect.void,
