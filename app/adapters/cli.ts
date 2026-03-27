@@ -1,5 +1,6 @@
 import { Effect, Match, pipe, Ref, Stream, Terminal } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
+import  { Prompt } from "../domain/models/primitives.ts";
 import { Agent, AgentSendInput } from "../ports/agent.ts";
 
 const assistant = Command.make(
@@ -19,13 +20,13 @@ const assistant = Command.make(
     const accumulated = yield* Ref.make("");
 
     yield* pipe(
-      agent.send(new AgentSendInput({ prompt })),
+      agent.send(new AgentSendInput({ prompt: Prompt.makeUnsafe(prompt) })),
       Stream.unwrap,
       Stream.runForEach((event) =>
         Match.valueTags(event, {
           TextDelta: ({ delta }) => Ref.update(accumulated, (prev) => prev + delta),
           ReasoningDelta: ({ delta }) => Effect.logDebug("Reasoning delta", { delta }),
-          ToolCall: ({ name }) => Ref.set(accumulated, ""),
+          ToolCall: () => Ref.set(accumulated, ""),
           ToolResult: ({ name, isFailure }) => Effect.logDebug("Tool result", { name, isFailure }),
           Usage: ({ inputTokens, outputTokens }) => Effect.logDebug("Usage", { inputTokens, outputTokens }),
         })

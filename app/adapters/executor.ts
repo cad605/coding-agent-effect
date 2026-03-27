@@ -3,6 +3,7 @@ import { Array, Effect, Layer, Match, Option, Ref, Result, Stream } from "effect
 import { Chat } from "effect/unstable/ai";
 
 import { ExecutorError } from "../domain/errors/executor.ts";
+import { Prompt, TokenCount, ToolCallId, ToolName, ToolOutput } from "../domain/models/primitives.ts";
 import { ReasoningDelta, TextDelta, ToolCall, ToolResult, type TurnEvent, Usage } from "../domain/models/turn-event.ts";
 import { Executor, type ExecutorShape } from "../ports/executor.ts";
 import { AgentExecutorTools, AgentExecutorToolsService } from "./services/agent-executor-tools.ts";
@@ -26,16 +27,22 @@ const makeImpl = Effect.gen(function*() {
           Match.value(part).pipe(
             Match.when({ type: "text-delta" }, ({ delta }) => Result.succeed(new TextDelta({ delta }))),
             Match.when({ type: "reasoning-delta" }, ({ delta }) => Result.succeed(new ReasoningDelta({ delta }))),
-            Match.when({ type: "tool-call" }, ({ name, id }) => Result.succeed(new ToolCall({ name, id }))),
+            Match.when({ type: "tool-call" }, ({ name, id }) =>
+              Result.succeed(new ToolCall({ name: name as ToolName, id: id as ToolCallId }))),
             Match.when({ type: "tool-result" }, ({ name, id, result, isFailure }) =>
               Result.succeed(
-                new ToolResult({ name, id, output: String(result), isFailure }),
+                new ToolResult({
+                  name: ToolName.makeUnsafe(name),
+                  id: ToolCallId.makeUnsafe(id),
+                  output: ToolOutput.makeUnsafe(String(result)),
+                  isFailure,
+                }),
               )),
             Match.when({ type: "finish" }, ({ usage: { inputTokens, outputTokens } }) =>
               Result.succeed(
                 new Usage({
-                  inputTokens: inputTokens.total ?? 0,
-                  outputTokens: outputTokens.total ?? 0,
+                  inputTokens: TokenCount.makeUnsafe(inputTokens.total ?? 0),
+                  outputTokens: TokenCount.makeUnsafe(outputTokens.total ?? 0),
                 }),
               )),
             Match.orElse(() => Result.failVoid),
@@ -71,7 +78,7 @@ const makeImpl = Effect.gen(function*() {
 
   const stream: ExecutorShape["stream"] = Effect.fn("executor.stream")(
     function*({ prompt }) {
-      return yield* runLoop({ prompt });
+      return yield* runLoop({ prompt: Prompt.makeUnsafe(prompt) });
     },
   );
 

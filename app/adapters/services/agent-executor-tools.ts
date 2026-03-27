@@ -3,6 +3,8 @@ import { Tool, Toolkit } from "effect/unstable/ai";
 import { ChildProcess } from "effect/unstable/process";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
+import { FileContents, FilePath, ShellCommand } from "../../domain/models/primitives.ts";
+
 export class ReadFileFailed extends Schema.TaggedErrorClass<ReadFileFailed>()("ReadFileFailed", {
   cause: Schema.Defect,
 }) {}
@@ -18,7 +20,7 @@ export class CommandFailed extends Schema.TaggedErrorClass<CommandFailed>()("Com
 export const ReadFileTool = Tool.make("readFile", {
   description: "Read and return the contents of a file",
   parameters: Schema.Struct({
-    filePath: Schema.String.annotate({
+    filePath: FilePath.annotate({
       description: "The path to the file to read",
     }),
   }),
@@ -30,10 +32,10 @@ export const ReadFileTool = Tool.make("readFile", {
 export const WriteFileTool = Tool.make("writeFile", {
   description: "Write content to a file",
   parameters: Schema.Struct({
-    filePath: Schema.String.annotate({
+    filePath: FilePath.annotate({
       description: "The path to the file to write",
     }),
-    content: Schema.String.annotate({
+    content: FileContents.annotate({
       description: "The contents to write to the file",
     }),
   }),
@@ -45,7 +47,7 @@ export const WriteFileTool = Tool.make("writeFile", {
 export const BashTool = Tool.make("bash", {
   description: "Execute a shell command",
   parameters: Schema.Struct({
-    command: Schema.String.annotate({
+    command: ShellCommand.annotate({
       description: "The command to execute",
     }),
   }),
@@ -65,7 +67,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
   const spawner = yield* ChildProcessSpawner;
 
   const readFile = Effect.fn("toolkit.readFile")(
-    function*({ filePath }: { filePath: string }) {
+    function*({ filePath }: { filePath: FilePath }) {
       yield* Effect.logDebug("Reading file", { filePath });
 
       return yield* fs.readFileString(filePath);
@@ -74,7 +76,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
   );
 
   const writeFile = Effect.fn("toolkit.writeFile")(
-    function*({ filePath, content }: { filePath: string; content: string }) {
+    function*({ filePath, content }: { filePath: FilePath; content: FileContents }) {
       yield* Effect.logDebug("Writing file", { filePath, content });
 
       yield* fs.writeFileString(filePath, content);
@@ -85,7 +87,7 @@ export const AgentExecutorToolsService = AgentExecutorTools.toLayer(Effect.gen(f
   );
 
   const bash = Effect.fn("tools.bash")(
-    function*({ command }: { command: string }) {
+    function*({ command }: { command: ShellCommand }) {
       yield* Effect.logDebug("Executing command", { command });
 
       return yield* spawner.string(ChildProcess.make(command, { shell: true }), {
