@@ -34,9 +34,7 @@ const makeImpl = Effect.gen(function*() {
                 new ToolResult({ name, id, output: String(result), isFailure }),
               )),
             Match.when({ type: "finish" }, ({ usage: { inputTokens, outputTokens }, reason }) => {
-              if (reason === "tool-calls") {
-                Ref.set(finishReason, reason)
-              }
+              Ref.set(finishReason, reason)
 
               return Result.succeed(
                 new Usage({
@@ -57,7 +55,7 @@ const makeImpl = Effect.gen(function*() {
               if (reason === "tool-calls") {
                 return yield* runLoop({ prompt: "" });
               }
-              
+
               return Stream.empty;
             }),
           ),
