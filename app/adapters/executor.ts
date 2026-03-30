@@ -1,6 +1,6 @@
 import { OpenRouterLanguageModel } from "@effect/ai-openrouter";
 import { Array, Effect, Layer, Match, Option, Ref, Result, Stream } from "effect";
-import { Chat } from "effect/unstable/ai";
+import { Chat, Prompt as AiPrompt } from "effect/unstable/ai";
 
 import { ExecutorError } from "../domain/errors/executor.ts";
 import { Prompt, TokenCount, ToolCallId, ToolName, ToolOutput } from "../domain/models/primitives.ts";
@@ -15,14 +15,30 @@ const SYSTEM_MESSAGE = {
 };
 
 const makeImpl = Effect.gen(function*() {
+  const chatPersistence = yield* Chat.Persistence;
   const toolkit = yield* AgentExecutorTools;
   const model = yield* OpenRouterLanguageModel.model("nvidia/nemotron-3-super-120b-a12b:free");
 
+  const initializeChat = Effect.fn("executor.initializeChat")(function*(chat: Chat.Persisted) {
+    const currentHistory = yield* Ref.get(chat.history);
+
+    if (currentHistory.content.length > 0) {
+      return;
+    }
+
+    yield* Ref.set(chat.history, AiPrompt.make([SYSTEM_MESSAGE]));
+    yield* chat.save.pipe(
+      Effect.mapError((cause) => new ExecutorError({ cause })),
+    );
+  });
+
   const stream: ExecutorShape["stream"] = Effect.fn("executor.stream")(
-    function*({ prompt, history }): Effect.fn.Return<ExecutorStreamResult> {
-      const chat = history
-        ? yield* Chat.fromJson(history).pipe(Effect.orDie)
-        : yield* Chat.fromPrompt([SYSTEM_MESSAGE]);
+    function*({ prompt, sessionId }): Effect.fn.Return<ExecutorStreamResult, ExecutorError> {
+      const chat = yield* chatPersistence.get(sessionId).pipe(
+        Effect.mapError((cause) => new ExecutorError({ cause })),
+      );
+
+      yield* initializeChat(chat);
 
       const runLoop = Effect.fn("executor.handleTurn")(
         function*(
@@ -88,11 +104,7 @@ const makeImpl = Effect.gen(function*() {
 
       const events = yield* runLoop({ prompt: Prompt.makeUnsafe(prompt) });
 
-      const exportHistory = chat.exportJson.pipe(
-        Effect.mapError((cause) => new ExecutorError({ cause })),
-      );
-
-      return { events, exportHistory };
+      return { events };
     },
   );
 

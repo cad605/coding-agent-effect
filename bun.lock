@@ -7,6 +7,7 @@
       "dependencies": {
         "@effect/ai-openrouter": "beta",
         "@effect/platform-bun": "beta",
+        "@effect/sql-sqlite-bun": "beta",
         "effect": "beta",
       },
       "devDependencies": {
@@ -49,6 +50,8 @@
     "@effect/platform-bun": ["@effect/platform-bun@4.0.0-beta.40", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.40" }, "peerDependencies": { "effect": "^4.0.0-beta.40" } }, "sha512-FoDORgCSo51clk8wgWWf3aGcsqGSq88iDOdkdGKtwW9upibzZbwN2lWoZuu7WW1QPygKR9qcFHVVn9yJRgDn/Q=="],
 
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.40", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.19.0" }, "peerDependencies": { "effect": "^4.0.0-beta.40" } }, "sha512-WMRVG7T8ZDALKCOacsx2ZZj3Ccaoq8YGeD9q7ZL4q8RwQv8Nmrl+4+KZl95/zHCqXzgK9oUJOlBfQ7CZr6PQOQ=="],
+
+    "@effect/sql-sqlite-bun": ["@effect/sql-sqlite-bun@4.0.0-beta.43", "", { "peerDependencies": { "effect": "^4.0.0-beta.43" } }, "sha512-Ryb7x0rBjW5NHegbzvz9y2Yv4KpwZ1UiPk7/Rv+Mkux74Qkjdmotmrvy9P+M5A9TZyL2Av+GpaLTPJKsL0PG+Q=="],
 
     "@msgpackr-extract/msgpackr-extract-darwin-arm64": ["@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw=="],
 

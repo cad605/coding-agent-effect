@@ -1,5 +1,9 @@
 .cursor/
 .repos/
+.sessions/
+.sessions.sqlite
+.sessions.sqlite-shm
+.sessions.sqlite-wal
 node_modules/
 *.tsbuildinfo
 .env

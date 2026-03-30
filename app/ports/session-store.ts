@@ -4,14 +4,8 @@ import type { SessionNotFoundError, SessionStoreError } from "../domain/errors/s
 import { SessionId } from "../domain/models/primitives.ts";
 import type { SessionMetadata } from "../domain/models/session.ts";
 
-export interface SessionData {
-  readonly metadata: SessionMetadata;
-  readonly history: string;
-}
-
-export class SessionStoreSaveInput extends Schema.Class("SessionStoreSaveInput")({
+export class SessionStoreTouchInput extends Schema.Class("SessionStoreTouchInput")({
   sessionId: SessionId,
-  history: Schema.String,
 }) {}
 
 export class SessionStoreLoadInput extends Schema.Class("SessionStoreLoadInput")({
@@ -20,9 +14,9 @@ export class SessionStoreLoadInput extends Schema.Class("SessionStoreLoadInput")
 
 export interface SessionStoreShape {
   create(): Effect.Effect<SessionMetadata, SessionStoreError>;
-  load(input: SessionStoreLoadInput): Effect.Effect<SessionData, SessionStoreError | SessionNotFoundError>;
-  save(input: SessionStoreSaveInput): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
-  loadLatest(): Effect.Effect<SessionData, SessionStoreError | SessionNotFoundError>;
+  load(input: SessionStoreLoadInput): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
+  touch(input: SessionStoreTouchInput): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
+  loadLatest(): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
 }
 
 export class SessionStore extends ServiceMap.Service<SessionStore, SessionStoreShape>()(

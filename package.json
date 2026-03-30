@@ -14,6 +14,7 @@
   "dependencies": {
     "@effect/ai-openrouter": "beta",
     "@effect/platform-bun": "beta",
+    "@effect/sql-sqlite-bun": "beta",
     "effect": "beta"
   },
   "devDependencies": {

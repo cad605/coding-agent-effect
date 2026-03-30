@@ -1,57 +1,60 @@
-import { DateTime, Effect, FileSystem, Layer, Path } from "effect";
-import { IdGenerator } from "effect/unstable/ai";
+import { DateTime, Effect, Layer } from "effect";
+import { Chat, IdGenerator } from "effect/unstable/ai";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { SessionNotFoundError, SessionStoreError } from "../domain/errors/session-store.ts";
 import { SessionId } from "../domain/models/primitives.ts";
 import { SessionMetadata } from "../domain/models/session.ts";
 import { SessionStore, type SessionStoreShape } from "../ports/session-store.ts";
 
-const SESSIONS_DIR = ".sessions";
+const SESSION_METADATA_TABLE = "session_metadata";
 
 const makeImpl = Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
+  const sql = (yield* SqlClient.SqlClient).withoutTransforms();
   const idGenerator = yield* IdGenerator.IdGenerator;
+  const chatPersistence = yield* Chat.Persistence;
+  const table = sql(SESSION_METADATA_TABLE);
 
-  yield* fs.makeDirectory(SESSIONS_DIR, { recursive: true });
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      session_id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `.pipe(
+    Effect.mapError((cause) => new SessionStoreError({ cause })),
+  );
 
-  const sessionPath = (id: string) => path.join(SESSIONS_DIR, `${id}.jsonl`);
+  const toMetadata = (row: {
+    readonly session_id: string;
+    readonly created_at: number;
+    readonly updated_at: number;
+  }) =>
+    new SessionMetadata({
+      sessionId: SessionId.makeUnsafe(row.session_id),
+      createdAt: new Date(Number(row.created_at)),
+      updatedAt: new Date(Number(row.updated_at)),
+    });
 
-  const writeSessionFile = Effect.fn("sessionStore.writeSessionFile")(function*(
-    filePath: string,
-    metadata: { sessionId: string; createdAt: string; updatedAt: string },
-    history: string,
-  ) {
-    yield* fs.writeFileString(filePath, `${JSON.stringify(metadata)}\n${history}\n`);
-  });
+  const loadMetadata = Effect.fn("sessionStore.loadMetadata")(function*(sessionId: string) {
+    const rows = yield* sql<{
+      readonly session_id: string;
+      readonly created_at: number;
+      readonly updated_at: number;
+    }>`
+      SELECT session_id, created_at, updated_at
+      FROM ${table}
+      WHERE session_id = ${sessionId}
+    `.pipe(
+      Effect.mapError((cause) => new SessionStoreError({ cause })),
+    );
 
-  const parseSessionFile = Effect.fn("sessionStore.parseSessionFile")(function*(filePath: string, content: string) {
-    const lines = content.split("\n").filter((l) => l.length > 0);
-
-    if (lines.length < 1) {
-      return yield* Effect.fail(new SessionStoreError({ cause: new Error(`Malformed session file: ${filePath}`) }));
+    const row = rows[0];
+    if (row === undefined) {
+      return yield* new SessionNotFoundError({ message: `Session not found: ${sessionId}` });
     }
 
-    const raw = JSON.parse(lines[0]) as {
-      sessionId: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-
-    return {
-      metadata: new SessionMetadata({
-        sessionId: SessionId.makeUnsafe(raw.sessionId),
-        createdAt: new Date(raw.createdAt),
-        updatedAt: new Date(raw.updatedAt),
-      }),
-      history: lines[1] ?? "",
-    };
-  });
-
-  const readSessionFile = Effect.fn("sessionStore.readSessionFile")(function*(filePath: string) {
-    const content = yield* fs.readFileString(filePath);
-
-    return yield* parseSessionFile(filePath, content);
+    return toMetadata(row);
   });
 
   const create: SessionStoreShape["create"] = Effect.fn("sessionStore.create")(
@@ -59,6 +62,7 @@ const makeImpl = Effect.gen(function*() {
       const id = yield* idGenerator.generateId();
       const now = yield* DateTime.nowAsDate;
       const sessionId = SessionId.makeUnsafe(id);
+      const nowMillis = now.getTime();
 
       const metadata = new SessionMetadata({
         sessionId,
@@ -66,98 +70,83 @@ const makeImpl = Effect.gen(function*() {
         updatedAt: now,
       });
 
-      yield* writeSessionFile(
-        sessionPath(id),
-        {
-          sessionId: id,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-        "",
+      yield* sql`
+        INSERT INTO ${table} (session_id, created_at, updated_at)
+        VALUES (${id}, ${nowMillis}, ${nowMillis})
+      `.pipe(
+        Effect.mapError((cause) => new SessionStoreError({ cause })),
+      );
+
+      yield* chatPersistence.getOrCreate(id).pipe(
+        Effect.asVoid,
+        Effect.tapError(() =>
+          sql`
+            DELETE FROM ${table}
+            WHERE session_id = ${id}
+          `.pipe(
+            Effect.ignore,
+          )
+        ),
+        Effect.mapError((cause) => new SessionStoreError({ cause })),
       );
 
       return metadata;
     },
-    Effect.catch((cause) => Effect.fail(new SessionStoreError({ cause }))),
   );
 
   const load: SessionStoreShape["load"] = Effect.fn("sessionStore.load")(
     function*({ sessionId }) {
-      const filePath = sessionPath(sessionId);
-      const exists = yield* fs.exists(filePath);
-
-      if (!exists) {
-        return yield* new SessionNotFoundError({ message: `Session not found: ${sessionId}` });
-      }
-
-      return yield* readSessionFile(filePath);
+      return yield* loadMetadata(sessionId);
     },
-    Effect.catch((cause) => Effect.fail(new SessionStoreError({ cause }))),
   );
 
-  const save: SessionStoreShape["save"] = Effect.fn("sessionStore.save")(
-    function*({ sessionId, history }) {
-      const filePath = sessionPath(sessionId);
-      const exists = yield* fs.exists(filePath);
-
-      if (!exists) {
-        return yield* new SessionNotFoundError({ message: `Session not found: ${sessionId}` });
-      }
-
-      const existing = yield* readSessionFile(filePath);
+  const touch: SessionStoreShape["touch"] = Effect.fn("sessionStore.touch")(
+    function*({ sessionId }) {
+      const existing = yield* loadMetadata(sessionId);
       const now = yield* DateTime.nowAsDate;
+      const nowMillis = now.getTime();
 
-      const updatedMetadata = new SessionMetadata({
-        sessionId: existing.metadata.sessionId,
-        createdAt: existing.metadata.createdAt,
-        updatedAt: now,
-      });
-
-      yield* writeSessionFile(
-        filePath,
-        {
-          sessionId,
-          createdAt: existing.metadata.createdAt.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-        history,
+      yield* sql`
+        UPDATE ${table}
+        SET updated_at = ${nowMillis}
+        WHERE session_id = ${sessionId}
+      `.pipe(
+        Effect.mapError((cause) => new SessionStoreError({ cause })),
       );
 
-      return updatedMetadata;
+      return new SessionMetadata({
+        sessionId: existing.sessionId,
+        createdAt: existing.createdAt,
+        updatedAt: now,
+      });
     },
-    Effect.catch((cause) => Effect.fail(new SessionStoreError({ cause }))),
   );
 
   const loadLatest: SessionStoreShape["loadLatest"] = Effect.fn("sessionStore.loadLatest")(
     function*() {
-      const entries = yield* fs.readDirectory(SESSIONS_DIR);
+      const rows = yield* sql<{
+        readonly session_id: string;
+        readonly created_at: number;
+        readonly updated_at: number;
+      }>`
+        SELECT session_id, created_at, updated_at
+        FROM ${table}
+        ORDER BY updated_at DESC
+        LIMIT 1
+      `.pipe(
+        Effect.mapError((cause) => new SessionStoreError({ cause })),
+      );
 
-      const jsonlFiles = entries.filter((e) => e.endsWith(".jsonl"));
-
-      if (jsonlFiles.length === 0) {
+      const row = rows[0];
+      if (row === undefined) {
         return yield* new SessionNotFoundError({ message: "No sessions found" });
       }
 
-      const sessions = yield* Effect.all(
-        jsonlFiles.map((file) => readSessionFile(path.join(SESSIONS_DIR, file))),
-        { concurrency: "unbounded" },
-      );
-
-      const sorted = sessions.slice().sort(
-        (a, b) => b.metadata.updatedAt.getTime() - a.metadata.updatedAt.getTime(),
-      );
-
-      const latest = sorted[0];
-      if (latest === undefined) {
-        return yield* new SessionNotFoundError({ message: "No sessions found" });
-      }
-
-      return latest;
+      return toMetadata(row);
     },
-    Effect.catch((cause) => Effect.fail(new SessionStoreError({ cause }))),
   );
 
-  return SessionStore.of({ create, load, save, loadLatest }) satisfies SessionStoreShape;
+  return SessionStore.of({ create, load, touch, loadLatest }) satisfies SessionStoreShape;
 });
 
 export const SessionStoreAdapter = Layer.effect(SessionStore, makeImpl);
