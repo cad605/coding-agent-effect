@@ -77,7 +77,14 @@ const makeImpl = Effect.gen(function*() {
     semaphore.withPermits(1),
   );
 
-  return Agent.of({ send }) satisfies AgentShape;
+  const listSessions: AgentShape["listSessions"] = Effect.fn("agent.listSessions")(
+    function*() {
+      return yield* sessionStore.list();
+    },
+    Effect.catch((cause) => Effect.fail(new AgentError({ cause }))),
+  );
+
+  return Agent.of({ send, listSessions }) satisfies AgentShape;
 });
 
 export const AgentService = Layer.effect(

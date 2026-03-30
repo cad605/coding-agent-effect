@@ -74,6 +74,20 @@ const assistant = Command.make(
   }),
 ).pipe(Command.withDescription("Coding Assistant"));
 
-export const CliAdapter = Command.run(assistant, {
+const listSessions = Command.make(
+  "list-sessions",
+  {},
+  Effect.fn("cli.listSessions")(function*() {
+    const agent = yield* Agent;
+    const terminal = yield* Terminal.Terminal;
+
+    const sessions = yield* agent.listSessions();
+    const output = sessions.map(({ sessionId }) => sessionId).join("\n");
+
+    yield* terminal.display(output);
+  }),
+).pipe(Command.withDescription("List session IDs from most recent to least recent"));
+
+export const CliAdapter = Command.run(assistant.pipe(Command.withSubcommands([listSessions])), {
   version: "1.0.0",
 });

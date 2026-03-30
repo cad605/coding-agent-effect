@@ -146,7 +146,25 @@ const makeImpl = Effect.gen(function*() {
     },
   );
 
-  return SessionStore.of({ create, load, touch, loadLatest }) satisfies SessionStoreShape;
+  const list: SessionStoreShape["list"] = Effect.fn("sessionStore.list")(
+    function*() {
+      const rows = yield* sql<{
+        readonly session_id: string;
+        readonly created_at: number;
+        readonly updated_at: number;
+      }>`
+        SELECT session_id, created_at, updated_at
+        FROM ${table}
+        ORDER BY updated_at DESC
+      `.pipe(
+        Effect.mapError((cause) => new SessionStoreError({ cause })),
+      );
+
+      return rows.map(toMetadata);
+    },
+  );
+
+  return SessionStore.of({ create, load, touch, loadLatest, list }) satisfies SessionStoreShape;
 });
 
 export const SessionStoreAdapter = Layer.effect(SessionStore, makeImpl);

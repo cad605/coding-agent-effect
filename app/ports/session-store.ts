@@ -17,6 +17,7 @@ export interface SessionStoreShape {
   load(input: SessionStoreLoadInput): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
   touch(input: SessionStoreTouchInput): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
   loadLatest(): Effect.Effect<SessionMetadata, SessionStoreError | SessionNotFoundError>;
+  list(): Effect.Effect<ReadonlyArray<SessionMetadata>, SessionStoreError>;
 }
 
 export class SessionStore extends ServiceMap.Service<SessionStore, SessionStoreShape>()(
